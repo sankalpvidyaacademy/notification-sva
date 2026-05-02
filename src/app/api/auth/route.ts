@@ -23,13 +23,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `This account does not have ${role} role` }, { status: 403 });
     }
 
-    // Return user data (without password)
+    // Parse subjects based on role
+    let subjects;
+    try {
+      const parsed = JSON.parse(user.subjects);
+      if (user.role === 'STUDENT') {
+        // Student: subjects is a flat array
+        subjects = Array.isArray(parsed) ? parsed : [];
+      } else {
+        // Teacher/Admin: subjects is a class→subjects map
+        subjects = typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+      }
+    } catch {
+      subjects = user.role === 'STUDENT' ? [] : {};
+    }
+
     const { password: _, ...userWithoutPassword } = user;
     return NextResponse.json({
       user: {
         ...userWithoutPassword,
         classes: JSON.parse(user.classes),
-        subjects: JSON.parse(user.subjects),
+        subjects,
       },
     });
   } catch (error) {

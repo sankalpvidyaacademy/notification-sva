@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,13 +13,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -30,9 +23,14 @@ import {
   GraduationCap,
   BookOpen,
   Search,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  X,
 } from "lucide-react";
-import { allClasses, getSubjectsForClass } from "@/lib/class-subjects";
+import { allClasses, getSubjectsForClass, type ClassSubjectMap } from "@/lib/class-subjects";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface UserItem {
   id: string;
@@ -40,7 +38,7 @@ interface UserItem {
   name: string;
   role: string;
   classes: string[];
-  subjects: string[];
+  subjects: ClassSubjectMap | string[];
 }
 
 interface UserManagementProps {
@@ -57,12 +55,17 @@ export function UserManagement({ filterRole }: UserManagementProps) {
   const { toast } = useToast();
 
   // Form state
-  const [formRole, setFormRole] = useState<"TEACHER" | "STUDENT">("TEACHER");
+  const [formRole, setFormRole] = useState<"TEACHER" | "STUDENT">(
+    filterRole || "TEACHER"
+  );
   const [formUserId, setFormUserId] = useState("");
   const [formName, setFormName] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formClasses, setFormClasses] = useState<string[]>([]);
-  const [formSubjects, setFormSubjects] = useState<string[]>([]);
+  // Teacher: class→subjects map; Student: flat subjects array
+  const [formTeacherSubjects, setFormTeacherSubjects] = useState<ClassSubjectMap>({});
+  const [formStudentSubjects, setFormStudentSubjects] = useState<string[]>([]);
+  const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({});
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -82,9 +85,76 @@ export function UserManagement({ filterRole }: UserManagementProps) {
     fetchUsers();
   }, [fetchUsers]);
 
-  const availableSubjects = formClasses.length > 0
-    ? [...new Set(formClasses.flatMap((c) => getSubjectsForClass(c)))].sort()
-    : [];
+  // Available subjects based on selected classes
+  const availableSubjectsForStudent = useMemo(() => {
+    if (formClasses.length === 0) return [];
+    // Student has only one class, but we compute from the first
+    return getSubjectsForClass(formClasses[0]);
+  }, [formClasses]);
+
+  const toggleClass = (cls: string) => {
+    if (formRole === "STUDENT") {
+      // Student: single class selection
+      if (formClasses.includes(cls)) {
+        setFormClasses([]);
+        setFormStudentSubjects([]);
+      } else {
+        setFormClasses([cls]);
+        setFormStudentSubjects([]);
+      }
+    } else {
+      // Teacher: multi-class selection
+      setFormClasses((prev) => {
+        const newClasses = prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls];
+        // Remove subjects for removed classes
+        setFormTeacherSubjects((prevMap) => {
+          const newMap = { ...prevMap };
+          // Remove deleted class entries
+          Object.keys(newMap).forEach((key) => {
+            if (!newClasses.includes(key)) delete newMap[key];
+          });
+          // Add new class with empty subjects
+          if (!prev.includes(cls) && !newMap[cls]) {
+            newMap[cls] = [];
+          }
+          return newMap;
+        });
+        if (!prev.includes(cls)) {
+          setExpandedClasses((prev2) => ({ ...prev2, [cls]: true }));
+        }
+        return newClasses;
+      });
+    }
+  };
+
+  const toggleTeacherSubject = (cls: string, subject: string) => {
+    setFormTeacherSubjects((prevMap) => {
+      const current = prevMap[cls] || [];
+      const newSubjects = current.includes(subject)
+        ? current.filter((s) => s !== subject)
+        : [...current, subject];
+      return { ...prevMap, [cls]: newSubjects };
+    });
+  };
+
+  const selectAllTeacherSubjects = (cls: string) => {
+    const available = getSubjectsForClass(cls);
+    setFormTeacherSubjects((prevMap) => ({ ...prevMap, [cls]: available }));
+  };
+
+  const clearTeacherSubjects = (cls: string) => {
+    setFormTeacherSubjects((prevMap) => ({ ...prevMap, [cls]: [] }));
+  };
+
+  const toggleExpand = (cls: string) => {
+    setExpandedClasses((prev) => ({ ...prev, [cls]: !prev[cls] }));
+  };
+
+  const toggleStudentSubject = (sub: string) => {
+    setFormStudentSubjects((prev) =>
+      prev.includes(sub) ? prev.filter((s) => s !== sub) : [...prev, sub]
+    );
+  };
 
   const openCreateDialog = (role: "TEACHER" | "STUDENT") => {
     setEditUser(null);
@@ -93,7 +163,9 @@ export function UserManagement({ filterRole }: UserManagementProps) {
     setFormName("");
     setFormPassword("");
     setFormClasses([]);
-    setFormSubjects([]);
+    setFormTeacherSubjects({});
+    setFormStudentSubjects([]);
+    setExpandedClasses({});
     setDialogOpen(true);
   };
 
@@ -104,7 +176,16 @@ export function UserManagement({ filterRole }: UserManagementProps) {
     setFormName(user.name);
     setFormPassword("");
     setFormClasses(user.classes);
-    setFormSubjects(user.subjects);
+    if (user.role === "TEACHER") {
+      setFormTeacherSubjects(user.subjects as ClassSubjectMap);
+      setFormStudentSubjects([]);
+    } else {
+      setFormStudentSubjects(user.subjects as string[]);
+      setFormTeacherSubjects({});
+    }
+    setExpandedClasses(
+      user.classes.reduce((acc, cls) => ({ ...acc, [cls]: true }), {})
+    );
     setDialogOpen(true);
   };
 
@@ -114,7 +195,29 @@ export function UserManagement({ filterRole }: UserManagementProps) {
       return;
     }
 
+    // Validate subjects
+    if (formRole === "TEACHER") {
+      for (const cls of formClasses) {
+        const subs = formTeacherSubjects[cls] || [];
+        if (subs.length === 0) {
+          toast({ title: "Error", description: `At least one subject required for ${cls}`, variant: "destructive" });
+          return;
+        }
+      }
+    } else {
+      if (formClasses.length === 0) {
+        toast({ title: "Error", description: "Class is required for students", variant: "destructive" });
+        return;
+      }
+      if (formStudentSubjects.length === 0) {
+        toast({ title: "Error", description: "At least one subject is required", variant: "destructive" });
+        return;
+      }
+    }
+
     try {
+      const subjects = formRole === "TEACHER" ? formTeacherSubjects : formStudentSubjects;
+
       if (editUser) {
         const body: Record<string, unknown> = {
           id: editUser.id,
@@ -122,7 +225,7 @@ export function UserManagement({ filterRole }: UserManagementProps) {
           name: formName,
           role: formRole,
           classes: formClasses,
-          subjects: formSubjects,
+          subjects,
         };
         if (formPassword) body.password = formPassword;
 
@@ -148,7 +251,7 @@ export function UserManagement({ filterRole }: UserManagementProps) {
             password: formPassword,
             role: formRole,
             classes: formClasses,
-            subjects: formSubjects,
+            subjects,
           }),
         });
 
@@ -183,27 +286,40 @@ export function UserManagement({ filterRole }: UserManagementProps) {
     }
   };
 
-  const toggleClass = (cls: string) => {
-    setFormClasses((prev) => {
-      const newClasses = prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls];
-      // Remove subjects that are no longer available
-      const available = [...new Set(newClasses.flatMap((c) => getSubjectsForClass(c)))];
-      setFormSubjects((prevSubjects) => prevSubjects.filter((s) => available.includes(s)));
-      return newClasses;
-    });
-  };
-
-  const toggleSubject = (sub: string) => {
-    setFormSubjects((prev) =>
-      prev.includes(sub) ? prev.filter((s) => s !== sub) : [...prev, sub]
-    );
-  };
-
   const filteredUsers = users.filter(
     (u) =>
       u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.userId.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const renderUserSubjects = (user: UserItem) => {
+    if (user.role === "STUDENT" && Array.isArray(user.subjects)) {
+      return user.subjects.length > 0 ? (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {user.subjects.map((s) => (
+            <Badge key={s} variant="outline" className="text-xs bg-primary/5">{s}</Badge>
+          ))}
+        </div>
+      ) : null;
+    }
+
+    if (user.role === "TEACHER" && typeof user.subjects === "object" && !Array.isArray(user.subjects)) {
+      const subjectMap = user.subjects as ClassSubjectMap;
+      return Object.entries(subjectMap).length > 0 ? (
+        <div className="space-y-1 mt-1">
+          {Object.entries(subjectMap).map(([cls, subs]) => (
+            <div key={cls} className="pl-2 border-l-2 border-primary/20">
+              <span className="text-xs text-muted-foreground">{cls}:</span>{" "}
+              {subs.map((s) => (
+                <Badge key={`${cls}-${s}`} variant="outline" className="text-xs bg-primary/5 mr-0.5">{s}</Badge>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null;
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-4">
@@ -211,7 +327,9 @@ export function UserManagement({ filterRole }: UserManagementProps) {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">User Management</h2>
+          <h2 className="text-lg font-semibold">
+            {filterRole ? `Manage ${filterRole === "TEACHER" ? "Teachers" : "Students"}` : "User Management"}
+          </h2>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial">
@@ -255,8 +373,8 @@ export function UserManagement({ filterRole }: UserManagementProps) {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="w-12 h-12 text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">No users found</p>
-            <p className="text-sm text-muted-foreground/70">Create your first user to get started</p>
+            <p className="text-muted-foreground">No {filterRole?.toLowerCase() || "user"}s found</p>
+            <p className="text-sm text-muted-foreground/70">Create your first {filterRole?.toLowerCase() || "user"} to get started</p>
           </CardContent>
         </Card>
       ) : (
@@ -284,21 +402,11 @@ export function UserManagement({ filterRole }: UserManagementProps) {
                       {user.classes.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {user.classes.map((c) => (
-                            <Badge key={c} variant="outline" className="text-xs">
-                              {c}
-                            </Badge>
+                            <Badge key={c} variant="outline" className="text-xs">{c}</Badge>
                           ))}
                         </div>
                       )}
-                      {user.subjects.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {user.subjects.map((s) => (
-                            <Badge key={s} variant="outline" className="text-xs bg-primary/5">
-                              {s}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+                      {renderUserSubjects(user)}
                     </div>
                     <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 ml-2">
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(user)}>
@@ -325,7 +433,7 @@ export function UserManagement({ filterRole }: UserManagementProps) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editUser ? "Edit User" : "Create User"}</DialogTitle>
+            <DialogTitle>{editUser ? "Edit" : "Create"} {formRole === "TEACHER" ? "Teacher" : "Student"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
@@ -338,15 +446,21 @@ export function UserManagement({ filterRole }: UserManagementProps) {
                     key={r}
                     type="button"
                     onClick={() => {
-                      setFormRole(r);
-                      setFormClasses([]);
-                      setFormSubjects([]);
+                      if (!editUser) {
+                        setFormRole(r);
+                        setFormClasses([]);
+                        setFormTeacherSubjects({});
+                        setFormStudentSubjects([]);
+                      }
                     }}
-                    className={`py-2.5 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                    className={`py-2.5 px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       formRole === r
                         ? "bg-primary text-primary-foreground shadow-md"
-                        : "bg-muted text-muted-foreground hover:bg-accent"
+                        : editUser
+                          ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                          : "bg-muted text-muted-foreground hover:bg-accent"
                     }`}
+                    disabled={!!editUser}
                   >
                     {r === "TEACHER" ? <GraduationCap className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
                     {r}
@@ -397,15 +511,19 @@ export function UserManagement({ filterRole }: UserManagementProps) {
               <Label>
                 {formRole === "TEACHER" ? "Assigned Classes" : "Class"}
               </Label>
+              {formRole === "STUDENT" && (
+                <p className="text-xs text-muted-foreground">Students can only be assigned to one class</p>
+              )}
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
                 {allClasses.map((cls) => (
                   <label
                     key={cls}
-                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-sm ${
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-sm",
                       formClasses.includes(cls)
                         ? "border-primary bg-primary/5"
                         : "border-border hover:border-primary/50"
-                    }`}
+                    )}
                   >
                     <Checkbox
                       checked={formClasses.includes(cls)}
@@ -415,33 +533,111 @@ export function UserManagement({ filterRole }: UserManagementProps) {
                   </label>
                 ))}
               </div>
-              {formRole === "STUDENT" && formClasses.length > 1 && (
-                <p className="text-xs text-amber-500">Students should typically be assigned to only one class</p>
-              )}
             </div>
 
-            {/* Subject Selection */}
-            {formClasses.length > 0 && (
+            {/* Teacher: Per-Class Subject Selection */}
+            {formRole === "TEACHER" && formClasses.length > 0 && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Subjects per Class</Label>
+                {formClasses.map((cls) => {
+                  const availableSubjects = getSubjectsForClass(cls);
+                  const selectedSubs = formTeacherSubjects[cls] || [];
+                  const isExpanded = expandedClasses[cls] !== false;
+
+                  return (
+                    <Card key={cls} className="border-primary/20 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(cls)}
+                        className="w-full flex items-center justify-between p-3 hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            selectedSubs.length > 0 ? "bg-green-500" : "bg-amber-500"
+                          )} />
+                          <span className="text-sm font-semibold">{cls}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {selectedSubs.length}/{availableSubjects.length}
+                          </Badge>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-1 border-t border-border/50">
+                          <div className="flex gap-2 mb-2">
+                            <button type="button" onClick={() => selectAllTeacherSubjects(cls)} className="text-xs text-primary hover:underline">
+                              Select All
+                            </button>
+                            <span className="text-xs text-muted-foreground">|</span>
+                            <button type="button" onClick={() => clearTeacherSubjects(cls)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+                              Clear
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {availableSubjects.map((sub) => (
+                              <label
+                                key={sub}
+                                className={cn(
+                                  "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-sm",
+                                  selectedSubs.includes(sub)
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border/50 hover:border-primary/30"
+                                )}
+                              >
+                                <Checkbox
+                                  checked={selectedSubs.includes(sub)}
+                                  onCheckedChange={() => toggleTeacherSubject(cls, sub)}
+                                />
+                                <span className="truncate text-xs">{sub}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {selectedSubs.length === 0 && (
+                            <p className="text-xs text-amber-500 mt-2 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> At least one subject required
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Student: Flat Subject Selection */}
+            {formRole === "STUDENT" && formClasses.length > 0 && (
               <div className="space-y-2">
-                <Label>Subjects</Label>
+                <Label>Subjects for {formClasses[0]}</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                  {availableSubjects.map((sub) => (
+                  {availableSubjectsForStudent.map((sub) => (
                     <label
                       key={sub}
-                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-sm ${
-                        formSubjects.includes(sub)
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-sm",
+                        formStudentSubjects.includes(sub)
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-primary/50"
-                      }`}
+                      )}
                     >
                       <Checkbox
-                        checked={formSubjects.includes(sub)}
-                        onCheckedChange={() => toggleSubject(sub)}
+                        checked={formStudentSubjects.includes(sub)}
+                        onCheckedChange={() => toggleStudentSubject(sub)}
                       />
                       <span className="truncate">{sub}</span>
                     </label>
                   ))}
                 </div>
+                {formStudentSubjects.length === 0 && (
+                  <p className="text-xs text-amber-500 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> At least one subject is required
+                  </p>
+                )}
               </div>
             )}
           </div>

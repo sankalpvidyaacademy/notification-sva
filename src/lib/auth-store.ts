@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { ClassSubjectMap } from './class-subjects';
 
 export interface User {
   id: string;
@@ -6,7 +7,7 @@ export interface User {
   name: string;
   role: 'ADMIN' | 'TEACHER' | 'STUDENT';
   classes: string[];
-  subjects: string[];
+  subjects: ClassSubjectMap | string[]; // Teacher: class→subjects map, Student: flat array
 }
 
 interface AuthState {

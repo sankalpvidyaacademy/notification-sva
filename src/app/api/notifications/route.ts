@@ -1,6 +1,9 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Type for class→subjects mapping
+type ClassSubjectMap = Record<string, string[]>;
+
 // GET /api/notifications - List notifications based on user role
 export async function GET(req: NextRequest) {
   try {
@@ -36,35 +39,44 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
     } else if (role === 'STUDENT') {
-      // Student sees: notifications addressed to students in their class + subject
-      const classes = userClasses ? JSON.parse(userClasses) : [];
-      const subjects = userSubjects ? JSON.parse(userSubjects) : [];
+      // Student sees: notifications addressed to students where their class+subjects match
+      const classes: string[] = userClasses ? JSON.parse(userClasses) : [];
+      const subjects: string[] = userSubjects ? JSON.parse(userSubjects) : [];
 
       if (classes.length === 0 || subjects.length === 0) {
         notifications = [];
       } else {
-        // Build OR conditions for each class-subject combination
-        const orConditions = [];
-        for (const cls of classes) {
-          for (const sub of subjects) {
-            orConditions.push({
-              recipientType: 'STUDENT',
-              targetClass: cls,
-              targetSubject: sub,
-            });
-          }
-        }
-
-        notifications = await db.notification.findMany({
-          where: { OR: orConditions },
+        // Get all STUDENT notifications and filter in-memory for precise matching
+        const allStudentNotifs = await db.notification.findMany({
+          where: { recipientType: 'STUDENT' },
           orderBy: { createdAt: 'desc' },
+        });
+
+        // Filter: student receives notif if their class is in targetData AND their subjects intersect
+        notifications = allStudentNotifs.filter((notif) => {
+          try {
+            const targetData: ClassSubjectMap = JSON.parse(notif.targetData);
+            const studentClass = classes[0]; // Student has single class
+            const targetSubjects = targetData[studentClass];
+            if (!targetSubjects) return false;
+            // Check intersection between student subjects and target subjects
+            return targetSubjects.some((s) => subjects.includes(s));
+          } catch {
+            return false;
+          }
         });
       }
     } else {
       notifications = [];
     }
 
-    return NextResponse.json({ notifications });
+    // Parse targetData for each notification
+    const parsed = notifications.map((n) => ({
+      ...n,
+      targetData: JSON.parse(n.targetData),
+    }));
+
+    return NextResponse.json({ notifications: parsed });
   } catch (error) {
     console.error('Get notifications error:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
@@ -74,14 +86,22 @@ export async function GET(req: NextRequest) {
 // POST /api/notifications - Create a new notification
 export async function POST(req: NextRequest) {
   try {
-    const { senderId, senderName, recipientType, targetClass, targetSubject, topic, message, date } = await req.json();
+    const { senderId, senderName, recipientType, targetData, topic, message, date } = await req.json();
 
     if (!senderId || !senderName || !recipientType || !topic || !message) {
       return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 });
     }
 
-    if (recipientType === 'STUDENT' && (!targetClass || !targetSubject)) {
-      return NextResponse.json({ error: 'Class and Subject are required for student notifications' }, { status: 400 });
+    if (recipientType === 'STUDENT') {
+      if (!targetData || Object.keys(targetData).length === 0) {
+        return NextResponse.json({ error: 'At least one class with subjects must be selected' }, { status: 400 });
+      }
+      // Validate at least one subject per class
+      for (const [cls, subs] of Object.entries(targetData as ClassSubjectMap)) {
+        if (!subs || subs.length === 0) {
+          return NextResponse.json({ error: `At least one subject must be selected for ${cls}` }, { status: 400 });
+        }
+      }
     }
 
     const notification = await db.notification.create({
@@ -89,22 +109,26 @@ export async function POST(req: NextRequest) {
         senderId,
         senderName,
         recipientType,
-        targetClass: targetClass || '',
-        targetSubject: targetSubject || '',
+        targetData: JSON.stringify(targetData || {}),
         topic,
         message,
         date: date || new Date().toISOString().split('T')[0],
       },
     });
 
-    return NextResponse.json({ notification }, { status: 201 });
+    return NextResponse.json({
+      notification: {
+        ...notification,
+        targetData: JSON.parse(notification.targetData),
+      },
+    }, { status: 201 });
   } catch (error) {
     console.error('Create notification error:', error);
     return NextResponse.json({ error: 'Failed to create notification' }, { status: 500 });
   }
 }
 
-// DELETE /api/notifications - Delete a notification
+// DELETE /api/notifications
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

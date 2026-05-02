@@ -1,25 +1,36 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
-// GET /api/users - List users (optionally filter by role)
+function parseUserSubjects(role: string, subjectsJson: string) {
+  try {
+    const parsed = JSON.parse(subjectsJson);
+    if (role === 'STUDENT') {
+      return Array.isArray(parsed) ? parsed : [];
+    }
+    // Teacher/Admin: class→subjects map
+    return typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return role === 'STUDENT' ? [] : {};
+  }
+}
+
+// GET /api/users
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const role = searchParams.get('role');
 
     const where = role ? { role } : {};
-
     const users = await db.user.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
 
-    // Parse JSON fields and remove passwords
     const sanitized = users.map((u) => ({
       ...u,
       password: undefined,
       classes: JSON.parse(u.classes),
-      subjects: JSON.parse(u.subjects),
+      subjects: parseUserSubjects(u.role, u.subjects),
     }));
 
     return NextResponse.json({ users: sanitized });
@@ -29,7 +40,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/users - Create a new user
+// POST /api/users
 export async function POST(req: NextRequest) {
   try {
     const { userId, name, password, role, classes, subjects } = await req.json();
@@ -38,7 +49,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 });
     }
 
-    // Check if userId already exists
     const existing = await db.user.findUnique({ where: { userId } });
     if (existing) {
       return NextResponse.json({ error: 'User ID already exists' }, { status: 409 });
@@ -51,7 +61,7 @@ export async function POST(req: NextRequest) {
         password,
         role,
         classes: JSON.stringify(classes || []),
-        subjects: JSON.stringify(subjects || []),
+        subjects: JSON.stringify(subjects || (role === 'STUDENT' ? [] : {})),
       },
     });
 
@@ -60,7 +70,7 @@ export async function POST(req: NextRequest) {
       user: {
         ...userWithoutPassword,
         classes: JSON.parse(user.classes),
-        subjects: JSON.parse(user.subjects),
+        subjects: parseUserSubjects(user.role, user.subjects),
       },
     }, { status: 201 });
   } catch (error) {
@@ -69,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT /api/users - Update a user
+// PUT /api/users
 export async function PUT(req: NextRequest) {
   try {
     const { id, userId, name, password, role, classes, subjects } = await req.json();
@@ -101,7 +111,7 @@ export async function PUT(req: NextRequest) {
       user: {
         ...userWithoutPassword,
         classes: JSON.parse(user.classes),
-        subjects: JSON.parse(user.subjects),
+        subjects: parseUserSubjects(user.role, user.subjects),
       },
     });
   } catch (error) {
@@ -110,7 +120,7 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// DELETE /api/users - Delete a user
+// DELETE /api/users
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

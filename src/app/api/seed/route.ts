@@ -3,13 +3,11 @@ import { NextResponse } from 'next/server';
 
 export async function POST() {
   try {
-    // Check if admin already exists
     const existing = await db.user.findUnique({ where: { userId: 'shobhit' } });
     if (existing) {
       return NextResponse.json({ message: 'Admin already exists' }, { status: 200 });
     }
 
-    // Create default admin
     await db.user.create({
       data: {
         userId: 'shobhit',
@@ -17,7 +15,7 @@ export async function POST() {
         password: 'Shobhit@1502',
         role: 'ADMIN',
         classes: '[]',
-        subjects: '[]',
+        subjects: '{}',
       },
     });
 

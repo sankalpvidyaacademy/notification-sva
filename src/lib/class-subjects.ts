@@ -20,11 +20,31 @@ export function getSubjectsForClass(className: string): string[] {
   return classSubjects[className] || [];
 }
 
-export function getSubjectsForClasses(classNames: string[]): string[] {
-  const subjectsSet = new Set<string>();
-  for (const cls of classNames) {
-    const subjects = classSubjects[cls] || [];
-    subjects.forEach((s) => subjectsSet.add(s));
+// Type for class-wise subject mapping
+export type ClassSubjectMap = Record<string, string[]>;
+
+// Parse teacher subjects from JSON string (class→subjects map)
+export function parseTeacherSubjects(json: string): ClassSubjectMap {
+  try {
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) return {};
+    return parsed as ClassSubjectMap;
+  } catch {
+    return {};
   }
-  return Array.from(subjectsSet);
+}
+
+// Parse student subjects from JSON string (flat array)
+export function parseStudentSubjects(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) return parsed;
+    // If it's an object, flatten values
+    if (typeof parsed === "object" && parsed !== null) {
+      return Object.values(parsed).flat() as string[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }

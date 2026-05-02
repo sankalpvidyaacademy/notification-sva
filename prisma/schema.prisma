@@ -13,8 +13,8 @@ model User {
   name      String
   password  String
   role      String   // ADMIN, TEACHER, STUDENT
-  classes   String   @default("[]") // JSON array of class names
-  subjects  String   @default("[]") // JSON array of subject names
+  classes   String   @default("[]") // JSON array of class names. Student: single-element array
+  subjects  String   @default("{}") // JSON: Teacher = { "Class 9 CBSE": ["Mathematics", "Physics"], ... }; Student = ["Mathematics", "Physics"] (flat array for their single class)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -24,8 +24,7 @@ model Notification {
   senderId      String
   senderName    String
   recipientType String   // ADMIN, TEACHER, STUDENT
-  targetClass   String   @default("") // For STUDENT recipient type
-  targetSubject String   @default("") // For STUDENT recipient type
+  targetData    String   @default("{}") // JSON: For STUDENT type = { "Class 9 CBSE": ["Mathematics", "Physics"], "Class 11 Science": ["Biology"] }
   topic         String
   message       String
   date          String   // Notification date

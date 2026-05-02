@@ -57,3 +57,42 @@ Stage Summary:
 - Dark/Light mode toggle working
 - All three role dashboards functional
 - Responsive design with mobile-optimized controls
+
+---
+Task ID: v2-update
+Agent: Main Agent
+Task: PRD v2 - Sidebar navigation, multi-class targeting, class-wise subject mapping, updated data structures
+
+Work Log:
+- Updated Prisma schema: Notification.targetData replaces targetClass+targetSubject; User.subjects now supports ClassSubjectMap (object) for teachers
+- Rewrote /api/notifications/route.ts with targetData (JSON class→subjects map), in-memory student filtering
+- Rewrote /api/users/route.ts with proper parsing of teacher subjects (class→subjects map) vs student subjects (flat array)
+- Updated /api/auth/route.ts to parse subjects based on role (map vs array)
+- Updated /api/seed/route.ts with new default values
+- Created AppSidebar component with role-based menu items, collapsible mobile drawer (Sheet), active state highlighting
+- Rebuilt Dashboard with sidebar+content layout replacing tab-based navigation
+- Added DashboardHome with welcome card, quick actions, user profile display
+- Added SettingsPage for account info
+- Completely rewrote NotificationForm for multi-class targeting:
+  - Select multiple classes at once
+  - Per-class subject selection with expand/collapse cards
+  - Select All / Clear buttons per class
+  - Green/amber status indicators for subject selection
+  - Remove class button
+  - Validation: at least one subject per class required
+- Completely rewrote UserManagement:
+  - Teacher creation: class-wise subject selection (same per-class card UI)
+  - Student creation: single class + flat subject list
+  - Subjects displayed by class in user cards
+- Rewrote NotificationList to display targetData as per-class subject badges
+- Updated class-subjects.ts with helper types (ClassSubjectMap, parseTeacherSubjects, parseStudentSubjects)
+- Updated auth-store.ts with ClassSubjectMap type for teacher subjects
+- All ESLint checks pass
+
+Stage Summary:
+- Sidebar navigation with role-based visibility (Admin: 6 items, Teacher: 3 items, Student: 2 items)
+- Multi-class notification targeting with per-class subject groups
+- Teacher subjects stored as { "Class 9 CBSE": ["Mathematics", "Physics"] } mapping
+- Student subjects stored as flat array with single class
+- Notification delivery matches class + subject intersection
+- Mobile-friendly drawer menu on small screens

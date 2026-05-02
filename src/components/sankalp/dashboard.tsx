@@ -1,39 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  LogOut,
-  Moon,
-  Sun,
-  Users,
-  Send,
-  Bell,
-  GraduationCap,
-  BookOpen,
-  Shield,
-  ChevronDown,
-  User,
-} from "lucide-react";
-import { useTheme } from "next-themes";
+import { AppSidebar, type PageKey } from "./app-sidebar";
 import { useAuthStore } from "@/lib/auth-store";
 import { UserManagement } from "./user-management";
 import { NotificationForm } from "./notification-form";
 import { NotificationList } from "./notification-list";
+import { Bell, Send, Users, GraduationCap, BookOpen, Settings, Shield, LayoutDashboard } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export function Dashboard() {
   const { user, logout } = useAuthStore();
-  const { theme, setTheme } = useTheme();
+  const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (!user) return null;
@@ -42,194 +21,307 @@ export function Dashboard() {
     setRefreshKey((k) => k + 1);
   };
 
-  const getRoleIcon = () => {
-    switch (user.role) {
-      case "ADMIN": return <Shield className="w-5 h-5" />;
-      case "TEACHER": return <GraduationCap className="w-5 h-5" />;
-      case "STUDENT": return <BookOpen className="w-5 h-5" />;
+  const handlePageChange = (page: PageKey) => {
+    setActivePage(page);
+    if (page === "all-notifications" || page === "my-notifications") {
+      setRefreshKey((k) => k + 1);
     }
   };
+
+  const getPageTitle = (): { title: string; description: string; icon: React.ReactNode } => {
+    switch (activePage) {
+      case "dashboard":
+        return { title: "Dashboard", description: "Overview of your notification system", icon: <LayoutDashboard className="w-5 h-5 text-primary" /> };
+      case "create-notification":
+        return { title: "Create Notification", description: "Send a new notification", icon: <Send className="w-5 h-5 text-primary" /> };
+      case "manage-teachers":
+        return { title: "Manage Teachers", description: "Create, edit, and manage teacher accounts", icon: <GraduationCap className="w-5 h-5 text-primary" /> };
+      case "manage-students":
+        return { title: "Manage Students", description: "Create, edit, and manage student accounts", icon: <BookOpen className="w-5 h-5 text-primary" /> };
+      case "all-notifications":
+        return { title: "All Notifications", description: "View all system notifications", icon: <Bell className="w-5 h-5 text-primary" /> };
+      case "my-notifications":
+        return { title: "My Notifications", description: "View your received notifications", icon: <Bell className="w-5 h-5 text-primary" /> };
+      case "settings":
+        return { title: "Settings", description: "System settings", icon: <Settings className="w-5 h-5 text-primary" /> };
+      default:
+        return { title: "Dashboard", description: "", icon: <LayoutDashboard className="w-5 h-5 text-primary" /> };
+    }
+  };
+
+  const pageInfo = getPageTitle();
+
+  const renderContent = () => {
+    switch (activePage) {
+      case "dashboard":
+        return <DashboardHome onNavigate={handlePageChange} />;
+
+      case "create-notification":
+        return <NotificationForm onSent={handleNotificationSent} />;
+
+      case "manage-teachers":
+        return <UserManagement filterRole="TEACHER" />;
+
+      case "manage-students":
+        return <UserManagement filterRole="STUDENT" />;
+
+      case "all-notifications":
+        return <NotificationList filter="all" showDelete={user.role === "ADMIN"} key={refreshKey} />;
+
+      case "my-notifications":
+        return <NotificationList filter="received" key={refreshKey} />;
+
+      case "settings":
+        return <SettingsPage />;
+
+      default:
+        return <DashboardHome onNavigate={handlePageChange} />;
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <AppSidebar
+        activePage={activePage}
+        onPageChange={handlePageChange}
+        onLogout={logout}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile spacer */}
+        <div className="h-14 md:hidden" />
+
+        {/* Page Header */}
+        <header className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40 md:top-0">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+            <div className="flex items-center gap-3">
+              {pageInfo.icon}
+              <div>
+                <h1 className="text-lg font-bold">{pageInfo.title}</h1>
+                <p className="text-xs text-muted-foreground">{pageInfo.description}</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6">
+          {renderContent()}
+        </main>
+
+        {/* Footer */}
+        <footer className="border-t border-border bg-background/80 backdrop-blur-lg mt-auto">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 text-center text-xs text-muted-foreground">
+            Sankalp Vidya Academy &copy; {new Date().getFullYear()} &mdash; Notification System
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function DashboardHome({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return null;
 
   const getRoleColor = () => {
     switch (user.role) {
-      case "ADMIN": return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-      case "TEACHER": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
-      case "STUDENT": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
+      case "ADMIN": return "from-amber-500/20 to-amber-500/5 border-amber-500/20";
+      case "TEACHER": return "from-blue-500/20 to-blue-500/5 border-blue-500/20";
+      case "STUDENT": return "from-green-500/20 to-green-500/5 border-green-500/20";
     }
   };
 
-  const getRoleLabel = () => {
+  const getRoleIcon = () => {
     switch (user.role) {
-      case "ADMIN": return "Administrator";
-      case "TEACHER": return "Teacher";
-      case "STUDENT": return "Student";
+      case "ADMIN": return <Shield className="w-6 h-6 text-amber-500" />;
+      case "TEACHER": return <GraduationCap className="w-6 h-6 text-blue-500" />;
+      case "STUDENT": return <BookOpen className="w-6 h-6 text-green-500" />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
-        <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary shadow-sm">
-              <GraduationCap className="w-5 h-5 text-primary-foreground" />
-            </div>
+    <div className="space-y-6">
+      {/* Welcome Card */}
+      <Card className={`bg-gradient-to-br ${getRoleColor()} border`}>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4">
+            {getRoleIcon()}
             <div>
-              <h1 className="text-sm font-bold leading-tight">Sankalp Vidya Academy</h1>
-              <p className="text-[11px] text-muted-foreground leading-tight">Notification System</p>
+              <h2 className="text-xl font-bold">Welcome, {user.name}!</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {user.role === "ADMIN" && "You have full access to manage the system."}
+                {user.role === "TEACHER" && "Send notifications to your assigned students."}
+                {user.role === "STUDENT" && "View notifications from your teachers and admin."}
+              </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            >
-              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 gap-1.5 px-2">
-                  <Badge variant="outline" className={`gap-1 text-xs px-1.5 py-0.5 ${getRoleColor()}`}>
-                    {getRoleIcon()}
-                  </Badge>
-                  <span className="text-sm font-medium max-w-[100px] truncate">{user.name}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.userId}</p>
-                    <Badge variant="outline" className={`gap-1 text-xs w-fit ${getRoleColor()}`}>
-                      {getRoleIcon()} {getRoleLabel()}
-                    </Badge>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {user.classes.length > 0 && (
-                  <>
-                    <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                      <User className="w-3.5 h-3.5 mr-2" />
-                      Classes: {user.classes.join(", ")}
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {user.subjects.length > 0 && (
-                  <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                    <BookOpen className="w-3.5 h-3.5 mr-2" />
-                    Subjects: {user.subjects.join(", ")}
-                  </DropdownMenuItem>
-                )}
-                {(user.classes.length > 0 || user.subjects.length > 0) && <DropdownMenuSeparator />}
-                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+      {/* Quick Actions */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {user.role === "ADMIN" && (
+            <>
+              <QuickAction
+                icon={<Send className="w-5 h-5" />}
+                title="Create Notification"
+                description="Send a notification to any role"
+                onClick={() => onNavigate("create-notification")}
+              />
+              <QuickAction
+                icon={<GraduationCap className="w-5 h-5" />}
+                title="Manage Teachers"
+                description="Create & manage teacher accounts"
+                onClick={() => onNavigate("manage-teachers")}
+              />
+              <QuickAction
+                icon={<BookOpen className="w-5 h-5" />}
+                title="Manage Students"
+                description="Create & manage student accounts"
+                onClick={() => onNavigate("manage-students")}
+              />
+              <QuickAction
+                icon={<Bell className="w-5 h-5" />}
+                title="All Notifications"
+                description="View system-wide notifications"
+                onClick={() => onNavigate("all-notifications")}
+              />
+            </>
+          )}
+          {user.role === "TEACHER" && (
+            <>
+              <QuickAction
+                icon={<Send className="w-5 h-5" />}
+                title="Create Notification"
+                description="Send notification to your students"
+                onClick={() => onNavigate("create-notification")}
+              />
+              <QuickAction
+                icon={<Bell className="w-5 h-5" />}
+                title="My Notifications"
+                description="View your notifications"
+                onClick={() => onNavigate("all-notifications")}
+              />
+            </>
+          )}
+          {user.role === "STUDENT" && (
+            <QuickAction
+              icon={<Bell className="w-5 h-5" />}
+              title="My Notifications"
+              description="View your received notifications"
+              onClick={() => onNavigate("my-notifications")}
+            />
+          )}
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4">
-        {user.role === "ADMIN" && <AdminDashboard onNotificationSent={handleNotificationSent} refreshKey={refreshKey} />}
-        {user.role === "TEACHER" && <TeacherDashboard onNotificationSent={handleNotificationSent} refreshKey={refreshKey} />}
-        {user.role === "STUDENT" && <StudentDashboard refreshKey={refreshKey} />}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-background/80 backdrop-blur-lg mt-auto">
-        <div className="max-w-4xl mx-auto px-4 py-3 text-center text-xs text-muted-foreground">
-          Sankalp Vidya Academy &copy; {new Date().getFullYear()} &mdash; Notification System
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function AdminDashboard({ onNotificationSent, refreshKey }: { onNotificationSent: () => void; refreshKey: number }) {
-  return (
-    <Tabs defaultValue="users" className="space-y-4">
-      <TabsList className="w-full grid grid-cols-3 h-auto p-1">
-        <TabsTrigger value="users" className="gap-1 text-xs sm:text-sm py-2">
-          <Users className="w-4 h-4" />
-          <span className="hidden sm:inline">User </span>Mgmt
-        </TabsTrigger>
-        <TabsTrigger value="send" className="gap-1 text-xs sm:text-sm py-2">
-          <Send className="w-4 h-4" />
-          <span className="hidden sm:inline">Send </span>Notify
-        </TabsTrigger>
-        <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm py-2">
-          <Bell className="w-4 h-4" />
-          <span className="hidden sm:inline">All </span>Notifs
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="users" className="mt-4">
-        <UserManagement />
-      </TabsContent>
-
-      <TabsContent value="send" className="mt-4">
-        <NotificationForm onSent={onNotificationSent} />
-      </TabsContent>
-
-      <TabsContent value="notifications" className="mt-4">
-        <NotificationList filter="all" showDelete key={refreshKey} />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-function TeacherDashboard({ onNotificationSent, refreshKey }: { onNotificationSent: () => void; refreshKey: number }) {
-  return (
-    <Tabs defaultValue="send" className="space-y-4">
-      <TabsList className="w-full grid grid-cols-2 h-auto p-1">
-        <TabsTrigger value="send" className="gap-1 text-xs sm:text-sm py-2">
-          <Send className="w-4 h-4" />
-          <span className="hidden sm:inline">Send </span>Notify
-        </TabsTrigger>
-        <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm py-2">
-          <Bell className="w-4 h-4" />
-          My Notifs
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="send" className="mt-4">
-        <NotificationForm onSent={onNotificationSent} />
-      </TabsContent>
-
-      <TabsContent value="notifications" className="mt-4">
-        <NotificationList filter="all" key={refreshKey} />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-function StudentDashboard({ refreshKey }: { refreshKey: number }) {
-  const user = useAuthStore((s) => s.user);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bell className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">My Notifications</h2>
-        </div>
-        {user && (
-          <div className="text-xs text-muted-foreground">
-            {user.classes[0] && <span>{user.classes[0]}</span>}
-          </div>
-        )}
       </div>
-      <NotificationList filter="received" key={refreshKey} />
+
+      {/* User Info */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Your Profile</h3>
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">User ID:</span>
+              <Badge variant="outline" className="font-mono text-xs">{user.userId}</Badge>
+            </div>
+            {user.classes.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-sm text-muted-foreground">
+                  {user.role === "STUDENT" ? "Class:" : "Assigned Classes:"}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {user.classes.map((c) => (
+                    <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {user.role === "STUDENT" && Array.isArray(user.subjects) && user.subjects.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-sm text-muted-foreground">Subjects:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {user.subjects.map((s) => (
+                    <Badge key={s} variant="outline" className="text-xs bg-primary/5">{s}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {user.role === "TEACHER" && typeof user.subjects === "object" && !Array.isArray(user.subjects) && Object.keys(user.subjects).length > 0 && (
+              <div className="space-y-2">
+                <span className="text-sm text-muted-foreground">Subjects by Class:</span>
+                {Object.entries(user.subjects as Record<string, string[]>).map(([cls, subs]) => (
+                  <div key={cls} className="pl-2 border-l-2 border-primary/30">
+                    <p className="text-xs font-medium mb-1">{cls}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {subs.map((s) => (
+                        <Badge key={s} variant="outline" className="text-xs bg-primary/5">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+function QuickAction({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <Card
+      className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all duration-200 group"
+      onClick={onClick}
+    >
+      <CardContent className="p-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+          {icon}
+        </div>
+        <div>
+          <h4 className="text-sm font-semibold">{title}</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SettingsPage() {
+  const user = useAuthStore((s) => s.user);
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Name:</span>
+            <span className="text-sm font-medium">{user?.name}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">User ID:</span>
+            <span className="text-sm font-mono">{user?.userId}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Role:</span>
+            <Badge variant="outline">{user?.role}</Badge>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

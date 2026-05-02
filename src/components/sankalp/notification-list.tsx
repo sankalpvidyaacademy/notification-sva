@@ -18,14 +18,14 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useToast } from "@/hooks/use-toast";
+import type { ClassSubjectMap } from "@/lib/class-subjects";
 
 interface Notification {
   id: string;
   senderId: string;
   senderName: string;
   recipientType: string;
-  targetClass: string;
-  targetSubject: string;
+  targetData: ClassSubjectMap;
   topic: string;
   message: string;
   date: string;
@@ -51,9 +51,12 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
       const params = new URLSearchParams({
         userId: user.id,
         role: user.role,
-        classes: JSON.stringify(user.classes),
-        subjects: JSON.stringify(user.subjects),
       });
+
+      if (user.role === "STUDENT") {
+        params.set("classes", JSON.stringify(user.classes));
+        params.set("subjects", JSON.stringify(user.subjects));
+      }
 
       const res = await fetch(`/api/notifications?${params}`);
       const data = await res.json();
@@ -108,6 +111,26 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
     return colors[type] || "bg-gray-500/10 text-gray-600";
   };
 
+  const renderTargetData = (targetData: ClassSubjectMap) => {
+    const entries = Object.entries(targetData);
+    if (entries.length === 0) return null;
+
+    return (
+      <div className="space-y-1 mt-1">
+        {entries.map(([cls, subs]) => (
+          <div key={cls} className="pl-2 border-l-2 border-primary/20">
+            <span className="text-xs text-muted-foreground">{cls}:</span>{" "}
+            {subs.map((s) => (
+              <Badge key={`${cls}-${s}`} variant="outline" className="text-xs bg-primary/5 mr-0.5">
+                {s}
+              </Badge>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -153,7 +176,7 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                        className="h-7 w-7 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
                         onClick={() => handleDelete(notif.id)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -172,20 +195,13 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
                     <Badge variant="outline" className={`text-xs gap-1 ${getRecipientBadge(notif.recipientType)}`}>
                       {getRecipientIcon(notif.recipientType)} {notif.recipientType}
                     </Badge>
-                    {notif.targetClass && (
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <BookOpen className="w-3 h-3" /> {notif.targetClass}
-                      </Badge>
-                    )}
-                    {notif.targetSubject && (
-                      <Badge variant="outline" className="text-xs gap-1 bg-primary/5">
-                        {notif.targetSubject}
-                      </Badge>
-                    )}
                     <Badge variant="outline" className="text-xs gap-1">
                       <CalendarDays className="w-3 h-3" /> {notif.date}
                     </Badge>
                   </div>
+
+                  {/* Target Data */}
+                  {renderTargetData(notif.targetData)}
                 </div>
               </CardContent>
             </Card>
