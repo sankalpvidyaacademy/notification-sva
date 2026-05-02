@@ -104,10 +104,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Get sender role from senderId
+    const sender = await db.user.findUnique({ where: { userId: senderId } });
+    const senderRole = sender?.role || 'ADMIN';
+
     const notification = await db.notification.create({
       data: {
         senderId,
         senderName,
+        senderRole,
         recipientType,
         targetData: JSON.stringify(targetData || {}),
         topic,

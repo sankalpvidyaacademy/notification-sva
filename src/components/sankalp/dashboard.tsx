@@ -6,7 +6,9 @@ import { useAuthStore } from "@/lib/auth-store";
 import { UserManagement } from "./user-management";
 import { NotificationForm } from "./notification-form";
 import { NotificationList } from "./notification-list";
-import { Bell, Send, Users, GraduationCap, BookOpen, Settings, Shield, LayoutDashboard } from "lucide-react";
+import { MessageForm } from "./message-form";
+import { MessageList } from "./message-list";
+import { Bell, Send, Users, GraduationCap, BookOpen, Settings, Shield, LayoutDashboard, MessageSquare, Mail } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -14,6 +16,7 @@ export function Dashboard() {
   const { user, logout } = useAuthStore();
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [msgRefreshKey, setMsgRefreshKey] = useState(0);
 
   if (!user) return null;
 
@@ -21,10 +24,17 @@ export function Dashboard() {
     setRefreshKey((k) => k + 1);
   };
 
+  const handleMessageSent = () => {
+    setMsgRefreshKey((k) => k + 1);
+  };
+
   const handlePageChange = (page: PageKey) => {
     setActivePage(page);
     if (page === "all-notifications" || page === "my-notifications") {
       setRefreshKey((k) => k + 1);
+    }
+    if (page === "student-messages" || page === "all-messages") {
+      setMsgRefreshKey((k) => k + 1);
     }
   };
 
@@ -42,6 +52,12 @@ export function Dashboard() {
         return { title: "All Notifications", description: "View all system notifications", icon: <Bell className="w-5 h-5 text-primary" /> };
       case "my-notifications":
         return { title: "My Notifications", description: "View your received notifications", icon: <Bell className="w-5 h-5 text-primary" /> };
+      case "send-message":
+        return { title: "Send Message", description: "Send a direct message to Admin or Teacher", icon: <Send className="w-5 h-5 text-primary" /> };
+      case "student-messages":
+        return { title: user.role === "STUDENT" ? "My Messages" : "Student Messages", description: "View and reply to messages", icon: <MessageSquare className="w-5 h-5 text-primary" /> };
+      case "all-messages":
+        return { title: "All Messages", description: "Monitor all system messages", icon: <Mail className="w-5 h-5 text-primary" /> };
       case "settings":
         return { title: "Settings", description: "System settings", icon: <Settings className="w-5 h-5 text-primary" /> };
       default:
@@ -71,6 +87,15 @@ export function Dashboard() {
       case "my-notifications":
         return <NotificationList filter="received" key={refreshKey} />;
 
+      case "send-message":
+        return <MessageForm onSent={handleMessageSent} />;
+
+      case "student-messages":
+        return <MessageList key={msgRefreshKey} />;
+
+      case "all-messages":
+        return <MessageList key={msgRefreshKey} viewMode="all" />;
+
       case "settings":
         return <SettingsPage />;
 
@@ -87,13 +112,13 @@ export function Dashboard() {
         onLogout={logout}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile spacer */}
-        <div className="h-14 md:hidden" />
+      {/* Main Content Area - flex column with min-h-screen */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* Mobile spacer for top bar */}
+        <div className="h-14 md:hidden shrink-0" />
 
         {/* Page Header */}
-        <header className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40 md:top-0">
+        <header className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40 md:top-0 shrink-0">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
             <div className="flex items-center gap-3">
               {pageInfo.icon}
@@ -105,13 +130,13 @@ export function Dashboard() {
           </div>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6">
+        {/* Content - flex-1 with overflow */}
+        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 overflow-y-auto">
           {renderContent()}
         </main>
 
-        {/* Footer */}
-        <footer className="border-t border-border bg-background/80 backdrop-blur-lg mt-auto">
+        {/* Footer - always at bottom */}
+        <footer className="border-t border-border bg-background/80 backdrop-blur-lg shrink-0 mt-auto">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 text-center text-xs text-muted-foreground">
             Sankalp Vidya Academy &copy; {new Date().getFullYear()} &mdash; Notification System
           </div>
@@ -152,8 +177,8 @@ function DashboardHome({ onNavigate }: { onNavigate: (page: PageKey) => void }) 
               <h2 className="text-xl font-bold">Welcome, {user.name}!</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {user.role === "ADMIN" && "You have full access to manage the system."}
-                {user.role === "TEACHER" && "Send notifications to your assigned students."}
-                {user.role === "STUDENT" && "View notifications from your teachers and admin."}
+                {user.role === "TEACHER" && "Send notifications to your assigned students and reply to messages."}
+                {user.role === "STUDENT" && "View notifications and send messages to your teachers and admin."}
               </p>
             </div>
           </div>
@@ -190,6 +215,12 @@ function DashboardHome({ onNavigate }: { onNavigate: (page: PageKey) => void }) 
                 description="View system-wide notifications"
                 onClick={() => onNavigate("all-notifications")}
               />
+              <QuickAction
+                icon={<Mail className="w-5 h-5" />}
+                title="All Messages"
+                description="Monitor all system messages"
+                onClick={() => onNavigate("all-messages")}
+              />
             </>
           )}
           {user.role === "TEACHER" && (
@@ -206,15 +237,35 @@ function DashboardHome({ onNavigate }: { onNavigate: (page: PageKey) => void }) 
                 description="View your notifications"
                 onClick={() => onNavigate("all-notifications")}
               />
+              <QuickAction
+                icon={<MessageSquare className="w-5 h-5" />}
+                title="Student Messages"
+                description="View and reply to student messages"
+                onClick={() => onNavigate("student-messages")}
+              />
             </>
           )}
           {user.role === "STUDENT" && (
-            <QuickAction
-              icon={<Bell className="w-5 h-5" />}
-              title="My Notifications"
-              description="View your received notifications"
-              onClick={() => onNavigate("my-notifications")}
-            />
+            <>
+              <QuickAction
+                icon={<Bell className="w-5 h-5" />}
+                title="My Notifications"
+                description="View your received notifications"
+                onClick={() => onNavigate("my-notifications")}
+              />
+              <QuickAction
+                icon={<Send className="w-5 h-5" />}
+                title="Send Message"
+                description="Send a message to Admin or Teacher"
+                onClick={() => onNavigate("send-message")}
+              />
+              <QuickAction
+                icon={<MessageSquare className="w-5 h-5" />}
+                title="My Messages"
+                description="View your conversations"
+                onClick={() => onNavigate("student-messages")}
+              />
+            </>
           )}
         </div>
       </div>

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Bell,
   User,
@@ -24,6 +25,7 @@ interface Notification {
   id: string;
   senderId: string;
   senderName: string;
+  senderRole: string;
   recipientType: string;
   targetData: ClassSubjectMap;
   topic: string;
@@ -40,6 +42,7 @@ interface NotificationListProps {
 export function NotificationList({ filter = "all", showDelete = false }: NotificationListProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [adminTab, setAdminTab] = useState<string>("ALL");
   const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
 
@@ -111,6 +114,15 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
     return colors[type] || "bg-gray-500/10 text-gray-600";
   };
 
+  const getSenderRoleBadge = (role: string) => {
+    const colors: Record<string, string> = {
+      ADMIN: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      TEACHER: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+      STUDENT: "bg-green-500/10 text-green-600 dark:text-green-400",
+    };
+    return colors[role] || "bg-gray-500/10 text-gray-600";
+  };
+
   const renderTargetData = (targetData: ClassSubjectMap) => {
     const entries = Object.entries(targetData);
     if (entries.length === 0) return null;
@@ -130,6 +142,53 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
       </div>
     );
   };
+
+  const renderNotificationCard = (notif: Notification) => (
+    <Card key={notif.id} className="group hover:shadow-md transition-all">
+      <CardContent className="p-4">
+        <div className="space-y-2">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-base leading-tight">{notif.topic}</h3>
+            {showDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                onClick={() => handleDelete(notif.id)}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {/* Message */}
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{notif.message}</p>
+
+          {/* Meta */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Badge variant="outline" className="text-xs gap-1">
+              <User className="w-3 h-3" /> {notif.senderName}
+            </Badge>
+            {notif.senderRole && (
+              <Badge variant="outline" className={`text-xs gap-1 ${getSenderRoleBadge(notif.senderRole)}`}>
+                {notif.senderRole}
+              </Badge>
+            )}
+            <Badge variant="outline" className={`text-xs gap-1 ${getRecipientBadge(notif.recipientType)}`}>
+              {getRecipientIcon(notif.recipientType)} {notif.recipientType}
+            </Badge>
+            <Badge variant="outline" className="text-xs gap-1">
+              <CalendarDays className="w-3 h-3" /> {notif.date}
+            </Badge>
+          </div>
+
+          {/* Target Data */}
+          {renderTargetData(notif.targetData)}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   if (loading) {
     return (
@@ -151,6 +210,89 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
     );
   }
 
+  // For Admin: Tab-based filtering by sender role
+  if (user?.role === "ADMIN" && filter === "all") {
+    const adminNotifs = notifications.filter((n) => (n.senderRole || "ADMIN") === "ADMIN");
+    const teacherNotifs = notifications.filter((n) => n.senderRole === "TEACHER");
+    const studentNotifs = notifications.filter((n) => n.senderRole === "STUDENT");
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-primary" />
+            <span className="text-sm text-muted-foreground">{notifications.length} notification{notifications.length !== 1 ? "s" : ""}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={fetchNotifications} className="gap-1">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </Button>
+        </div>
+
+        <Tabs value={adminTab} onValueChange={setAdminTab}>
+          <TabsList className="w-full grid grid-cols-4">
+            <TabsTrigger value="ALL" className="text-xs">
+              All ({notifications.length})
+            </TabsTrigger>
+            <TabsTrigger value="ADMIN" className="text-xs">
+              Admin ({adminNotifs.length})
+            </TabsTrigger>
+            <TabsTrigger value="TEACHER" className="text-xs">
+              Teacher ({teacherNotifs.length})
+            </TabsTrigger>
+            <TabsTrigger value="STUDENT" className="text-xs">
+              Student ({studentNotifs.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="ALL" className="mt-3">
+            <ScrollArea className="max-h-[calc(100vh-360px)]">
+              <div className="space-y-3 pr-2">
+                {notifications.map(renderNotificationCard)}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="ADMIN" className="mt-3">
+            {adminNotifs.length === 0 ? (
+              <EmptyTabMessage role="Admin" />
+            ) : (
+              <ScrollArea className="max-h-[calc(100vh-360px)]">
+                <div className="space-y-3 pr-2">
+                  {adminNotifs.map(renderNotificationCard)}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          <TabsContent value="TEACHER" className="mt-3">
+            {teacherNotifs.length === 0 ? (
+              <EmptyTabMessage role="Teacher" />
+            ) : (
+              <ScrollArea className="max-h-[calc(100vh-360px)]">
+                <div className="space-y-3 pr-2">
+                  {teacherNotifs.map(renderNotificationCard)}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          <TabsContent value="STUDENT" className="mt-3">
+            {studentNotifs.length === 0 ? (
+              <EmptyTabMessage role="Student" />
+            ) : (
+              <ScrollArea className="max-h-[calc(100vh-360px)]">
+                <div className="space-y-3 pr-2">
+                  {studentNotifs.map(renderNotificationCard)}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
+
+  // Non-admin view or filtered view
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -165,49 +307,20 @@ export function NotificationList({ filter = "all", showDelete = false }: Notific
 
       <ScrollArea className="max-h-[calc(100vh-300px)]">
         <div className="space-y-3 pr-2">
-          {notifications.map((notif) => (
-            <Card key={notif.id} className="group hover:shadow-md transition-all">
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-base leading-tight">{notif.topic}</h3>
-                    {showDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(notif.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Message */}
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{notif.message}</p>
-
-                  {/* Meta */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <User className="w-3 h-3" /> {notif.senderName}
-                    </Badge>
-                    <Badge variant="outline" className={`text-xs gap-1 ${getRecipientBadge(notif.recipientType)}`}>
-                      {getRecipientIcon(notif.recipientType)} {notif.recipientType}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <CalendarDays className="w-3 h-3" /> {notif.date}
-                    </Badge>
-                  </div>
-
-                  {/* Target Data */}
-                  {renderTargetData(notif.targetData)}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {notifications.map(renderNotificationCard)}
         </div>
       </ScrollArea>
     </div>
+  );
+}
+
+function EmptyTabMessage({ role }: { role: string }) {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+        <Inbox className="w-10 h-10 text-muted-foreground/50 mb-2" />
+        <p className="text-muted-foreground text-sm">No notifications from {role}</p>
+      </CardContent>
+    </Card>
   );
 }

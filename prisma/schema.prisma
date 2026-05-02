@@ -23,6 +23,7 @@ model Notification {
   id            String   @id @default(cuid())
   senderId      String
   senderName    String
+  senderRole    String   @default("ADMIN") // ADMIN, TEACHER, STUDENT
   recipientType String   // ADMIN, TEACHER, STUDENT
   targetData    String   @default("{}") // JSON: For STUDENT type = { "Class 9 CBSE": ["Mathematics", "Physics"], "Class 11 Science": ["Biology"] }
   topic         String
@@ -30,4 +31,19 @@ model Notification {
   date          String   // Notification date
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model Message {
+  id           String   @id @default(cuid())
+  senderId     String   // userId of sender
+  senderName   String
+  senderRole   String   // ADMIN, TEACHER, STUDENT
+  receiverId   String   // userId of receiver
+  receiverName String
+  receiverRole String   // ADMIN, TEACHER, STUDENT
+  topic        String
+  message      String
+  parentMsgId  String?  // For replies: links to parent message
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

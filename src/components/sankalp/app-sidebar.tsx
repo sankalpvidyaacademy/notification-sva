@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,7 +13,6 @@ import {
 import {
   LayoutDashboard,
   Send,
-  Users,
   GraduationCap,
   BookOpen,
   Bell,
@@ -24,6 +22,8 @@ import {
   Shield,
   Moon,
   Sun,
+  MessageSquare,
+  Mail,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuthStore } from "@/lib/auth-store";
@@ -35,6 +35,9 @@ export type PageKey =
   | "manage-students"
   | "all-notifications"
   | "my-notifications"
+  | "send-message"
+  | "student-messages"
+  | "all-messages"
   | "settings";
 
 interface SidebarItem {
@@ -50,6 +53,7 @@ function getAdminItems(): SidebarItem[] {
     { key: "manage-teachers", label: "Manage Teachers", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "manage-students", label: "Manage Students", icon: <BookOpen className="w-4 h-4" /> },
     { key: "all-notifications", label: "All Notifications", icon: <Bell className="w-4 h-4" /> },
+    { key: "all-messages", label: "All Messages", icon: <Mail className="w-4 h-4" /> },
     { key: "settings", label: "Settings", icon: <Settings className="w-4 h-4" /> },
   ];
 }
@@ -59,6 +63,7 @@ function getTeacherItems(): SidebarItem[] {
     { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
     { key: "create-notification", label: "Create Notification", icon: <Send className="w-4 h-4" /> },
     { key: "all-notifications", label: "My Notifications", icon: <Bell className="w-4 h-4" /> },
+    { key: "student-messages", label: "Student Messages", icon: <MessageSquare className="w-4 h-4" /> },
   ];
 }
 
@@ -66,6 +71,8 @@ function getStudentItems(): SidebarItem[] {
   return [
     { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
     { key: "my-notifications", label: "My Notifications", icon: <Bell className="w-4 h-4" /> },
+    { key: "send-message", label: "Send Message", icon: <Send className="w-4 h-4" /> },
+    { key: "student-messages", label: "My Messages", icon: <MessageSquare className="w-4 h-4" /> },
   ];
 }
 
