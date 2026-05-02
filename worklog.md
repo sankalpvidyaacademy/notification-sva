@@ -72,3 +72,27 @@ Stage Summary:
   - Default deny for unmatched paths
 - Rollback plan: Change USE_FIREBASE=false in Vercel to instantly revert to Prisma
 - Firebase CLI configuration ready for rules deployment
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Apply Phase 2 Firestore Security Rules
+
+Work Log:
+- Replaced /firestore.rules contents with Phase 2 production security rules
+- Phase 2 rules now enforce:
+  - Users: authenticated read/create, self-only update/delete (Admin override via Admin SDK)
+  - Notifications: authenticated read, ADMIN/TEACHER-only create, ADMIN-only delete, no updates
+  - Messages: sender/receiver read, ADMIN full read, authenticated create (senderId must match token), sender-only update/delete
+  - Default deny: any collection not explicitly listed is blocked
+- Verified all API endpoints still work correctly (Admin SDK bypasses rules)
+- Tested: /api/adapter-status, /api/auth, /api/users, /api/notifications, /api/messages — all return 200
+- Lint passes cleanly
+- No existing project files modified — only firestore.rules updated
+
+Stage Summary:
+- Phase 2 security rules are now the active rules in /firestore.rules
+- To deploy to Firebase: `firebase deploy --only firestore:rules`
+- Architecture note: Admin SDK (used in API routes) bypasses all Firestore rules, so server-side operations are unaffected
+- Phase 2 rules provide defense-in-depth for any potential direct client-side Firestore access
+- Custom claims (role, userId) must be set on Firebase Auth users for Phase 2 rules to work with client-side access
