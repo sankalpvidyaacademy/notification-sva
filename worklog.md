@@ -34,3 +34,41 @@ Stage Summary:
 - Adapter provides unified interface: getUserService(), getAuthService(), getNotificationService(), getMessageService()
 - Firestore security rules provided in two phases (development + production)
 - Data migration script available for moving existing SQLite data to Firestore
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: PRD v5 - Deployment + Production Security (Vercel + Firebase)
+
+Work Log:
+- Updated .env with comprehensive Firebase environment variables (NEXT_PUBLIC_ for client SDK, FIREBASE_ for Admin SDK, USE_FIREBASE switch)
+- Created /vercel.json - Next.js deployment config with security headers, bun install, asia-south1 region
+- Created /.vercelignore - Deployment exclusions (node_modules, .env, db, prisma, examples, etc.)
+- Updated /firestore-rules/firestore.rules.phase2 - Rewritten to match PRD v5 spec with proper role-based rules (users read/create for auth, admin-only notification delete, sender/receiver message access, default deny)
+- Created /firestore.rules - Root-level rules file for Firebase CLI deployment (Phase 1 by default)
+- Created /firebase.json - Firebase CLI config pointing to firestore.rules
+- Created /DEPLOYMENT.md - Comprehensive deployment guide covering:
+  - Phase 1: Firebase Project Setup (Firestore, Web App, Service Account, Custom Claims)
+  - Phase 2: GitHub Repository Setup
+  - Phase 3: Vercel Deployment (import, build config, env vars, deploy, verify)
+  - Phase 4: Apply Firestore Security Rules (Phase 1 → Phase 2)
+  - Phase 5: Data Migration from SQLite to Firestore
+  - Post-Deployment Configuration (custom domain, monitoring, backup)
+  - Troubleshooting guide
+  - Rollback plan
+- Updated /firestore-rules/README.md - Added Vercel deployment notes, Admin SDK security explanation, custom claims setup, rules comparison table
+- Lint passes cleanly
+- All APIs tested and working (auth, notifications, messages, adapter-status)
+- App continues to work with Prisma/SQLite backend (USE_FIREBASE=false)
+
+Stage Summary:
+- Complete Vercel deployment infrastructure ready
+- No modifications to existing project logic or UI code
+- All deployment configuration files created as new files
+- Phase 2 security rules updated to match PRD v5 specification with:
+  - Users: auth required for read/create, self-only update/delete
+  - Notifications: auth required for read, ADMIN/TEACHER create, ADMIN-only delete
+  - Messages: sender/receiver read, auth create, sender-only update/delete
+  - Default deny for unmatched paths
+- Rollback plan: Change USE_FIREBASE=false in Vercel to instantly revert to Prisma
+- Firebase CLI configuration ready for rules deployment

@@ -7,96 +7,82 @@
 // 🚨 Applying too early may break the app
 //
 // ✅ Apply this when:
-//    1. All features are tested and working
-//    2. Authentication is stable
-//    3. You're ready for production deployment
+//    1. All features are tested and working with Phase 1 rules
+//    2. Firebase Authentication is integrated
+//    3. Custom claims (role, userId) are set on auth tokens
+//    4. You're ready for production deployment
+//
+// ⚠️ PREREQUISITE:
+//    - Users must have custom claims set:
+//      { role: "ADMIN" | "TEACHER" | "STUDENT", userId: "shobhit" }
+//    - Set claims via Firebase Admin SDK:
+//      admin.auth().setCustomUserClaims(uid, { role: "ADMIN", userId: "shobhit" })
 // ─────────────────────────────────────────────────────────
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helper Functions ───
-
-    // Check if user is authenticated
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    // Get user's role from custom claims or users collection
-    function getUserRole() {
-      return request.auth.token.role;
-    }
-
-    // Check if user is admin
-    function isAdmin() {
-      return isAuth() && getUserRole() == 'ADMIN';
-    }
-
-    // Check if user is teacher
-    function isTeacher() {
-      return isAuth() && getUserRole() == 'TEACHER';
-    }
-
-    // Check if user is student
-    function isStudent() {
-      return isAuth() && getUserRole() == 'STUDENT';
-    }
-
-    // ─── Users Collection ───
+    // ─── USERS COLLECTION ───
 
     match /users/{userId} {
-      // Admin can do everything
-      allow read, write: if isAdmin();
+      // Any authenticated user can read user profiles
+      allow read: if request.auth != null;
 
-      // Teachers can read other users
-      allow read: if isTeacher();
+      // Any authenticated user can create (registration)
+      allow create: if request.auth != null;
 
-      // Students can read their own profile
-      allow read: if isStudent() && request.auth.uid == userId;
-
-      // No one can create/update/delete except admin (handled above)
+      // Only the user themselves can update/delete their profile
+      // Admin override is handled via Admin SDK (server-side, bypasses rules)
+      allow update, delete: if request.auth != null
+        && request.auth.token.userId == userId;
     }
 
-    // ─── Notifications Collection ───
+    // ─── NOTIFICATIONS COLLECTION ───
 
-    match /notifications/{notifId} {
-      // Admin can do everything
-      allow read, write: if isAdmin();
+    match /notifications/{notificationId} {
+      // Any authenticated user can read notifications
+      // (Filtering by role/class/subject is done in the API layer)
+      allow read: if request.auth != null;
 
-      // Teachers can read notifications sent by them or to teachers
-      allow read: if isTeacher() &&
-        (resource.data.senderId == request.auth.token.userId ||
-         resource.data.recipientType == 'TEACHER');
+      // Only ADMIN & TEACHER can create notifications
+      allow create: if request.auth != null
+        && request.auth.token.role in ['ADMIN', 'TEACHER'];
 
-      // Teachers can create notifications
-      allow create: if isTeacher();
+      // Only ADMIN can delete notifications
+      allow delete: if request.auth != null
+        && request.auth.token.role == 'ADMIN';
 
-      // Students can read notifications addressed to students
-      // that match their class and subjects
-      allow read: if isStudent() &&
-        resource.data.recipientType == 'STUDENT';
-
-      // No one can update/delete except admin (handled above)
+      // No updates allowed (notifications are immutable)
+      allow update: if false;
     }
 
-    // ─── Messages Collection ───
+    // ─── MESSAGES COLLECTION ───
 
-    match /messages/{msgId} {
-      // Admin can see all messages (full monitoring)
-      allow read, write: if isAdmin();
+    match /messages/{messageId} {
+      // Sender or Receiver can read their messages
+      // Admin sees all (handled via Admin SDK on server side)
+      allow read: if request.auth != null
+        && (
+          request.auth.token.userId == resource.data.senderId
+          || request.auth.token.userId == resource.data.receiverId
+          || request.auth.token.role == 'ADMIN'
+        );
 
-      // Users can read messages where they are sender or receiver
-      allow read: if isAuth() &&
-        (resource.data.senderId == request.auth.token.userId ||
-         resource.data.receiverId == request.auth.token.userId);
+      // Any authenticated user can send a message
+      allow create: if request.auth != null
+        && request.auth.token.userId == request.resource.data.senderId;
 
-      // Authenticated users can create messages
-      allow create: if isAuth() &&
-        request.data.senderId == request.auth.token.userId;
+      // Only sender can update/delete their own messages
+      allow update, delete: if request.auth != null
+        && request.auth.token.userId == resource.data.senderId;
+    }
 
-      // No one can update messages
-      // Only admin can delete (handled above)
+    // ─── DEFAULT DENY ───
+    // Deny access to any collection not explicitly listed above
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

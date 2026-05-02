@@ -1,12 +1,14 @@
 // ─────────────────────────────────────────────────────────
-// FIRESTORE SECURITY RULES — PHASE 1 (INITIAL SETUP)
+// FIRESTORE SECURITY RULES — Default (Phase 1: Development)
 // ─────────────────────────────────────────────────────────
 //
-// ⚠️ USE THIS FIRST during development and integration
-// ⚠️ This allows all authenticated reads/writes
-// ⚠️ Prevents permission errors while testing
+// This is the file used by `firebase deploy --only firestore:rules`
+// It currently points to Phase 1 (open) rules for development.
 //
-// 🚨 APPLY PHASE 2 RULES AFTER FULL TESTING IS COMPLETE
+// ⚠️ Switch to Phase 2 rules when ready for production:
+//    1. Copy contents from firestore-rules/firestore.rules.phase2
+//    2. Replace this file's contents
+//    3. Run: firebase deploy --only firestore:rules
 // ─────────────────────────────────────────────────────────
 
 rules_version = '2';
