@@ -1,6 +1,8 @@
 /**
  * Firebase Notification Service Implementation
  * Uses Firestore for notification operations
+ *
+ * Note: Queries sort in memory to avoid requiring composite indexes.
  */
 
 import { getFirestore } from "@/firebase/firebaseAdmin";
@@ -21,15 +23,15 @@ function docToNotificationData(doc: FirebaseFirestore.DocumentSnapshot): Notific
     topic: d.topic || "",
     message: d.message || "",
     date: d.date || "",
-    createdAt: d.createdAt?.toDate() || new Date(),
-    updatedAt: d.updatedAt?.toDate() || new Date(),
+    createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : new Date(d.createdAt),
+    updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt),
   };
 }
 
 export class FirebaseNotificationService implements INotificationService {
   private getCollection() {
     const db = getFirestore();
-    if (!db) throw new Error("Firestore not initialized");
+    if (!db) throw new Error("Firestore not initialized - check Firebase Admin SDK configuration");
     return db.collection(COLLECTION);
   }
 
@@ -39,19 +41,17 @@ export class FirebaseNotificationService implements INotificationService {
   }
 
   async findBySender(senderId: string): Promise<NotificationData[]> {
-    const snapshot = await this.getCollection()
-      .where("senderId", "==", senderId)
-      .orderBy("createdAt", "desc")
-      .get();
-    return snapshot.docs.map(docToNotificationData).filter(Boolean) as NotificationData[];
+    // Simple query + in-memory sort to avoid composite index
+    const snapshot = await this.getCollection().where("senderId", "==", senderId).get();
+    const results = snapshot.docs.map(docToNotificationData).filter(Boolean) as NotificationData[];
+    return results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async findByRecipientType(recipientType: string): Promise<NotificationData[]> {
-    const snapshot = await this.getCollection()
-      .where("recipientType", "==", recipientType)
-      .orderBy("createdAt", "desc")
-      .get();
-    return snapshot.docs.map(docToNotificationData).filter(Boolean) as NotificationData[];
+    // Simple query + in-memory sort to avoid composite index
+    const snapshot = await this.getCollection().where("recipientType", "==", recipientType).get();
+    const results = snapshot.docs.map(docToNotificationData).filter(Boolean) as NotificationData[];
+    return results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async findById(id: string): Promise<NotificationData | null> {

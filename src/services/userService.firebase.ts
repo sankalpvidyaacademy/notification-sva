@@ -1,6 +1,9 @@
 /**
  * Firebase User Service Implementation
  * Uses Firestore for user operations
+ *
+ * Note: Queries sort in memory to avoid requiring composite indexes.
+ * This is fine for school-scale data (hundreds of users, not millions).
  */
 
 import { getFirestore } from "@/firebase/firebaseAdmin";
@@ -19,15 +22,15 @@ function docToUserData(doc: FirebaseFirestore.DocumentSnapshot): UserData | null
     role: d.role || "STUDENT",
     classes: d.classes || [],
     subjects: d.subjects || (d.role === "STUDENT" ? [] : {}),
-    createdAt: d.createdAt?.toDate() || new Date(),
-    updatedAt: d.updatedAt?.toDate() || new Date(),
+    createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : new Date(d.createdAt),
+    updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt),
   };
 }
 
 export class FirebaseUserService implements IUserService {
   private getCollection() {
     const db = getFirestore();
-    if (!db) throw new Error("Firestore not initialized");
+    if (!db) throw new Error("Firestore not initialized - check Firebase Admin SDK configuration");
     return db.collection(COLLECTION);
   }
 
@@ -43,13 +46,15 @@ export class FirebaseUserService implements IUserService {
   }
 
   async findAll(role?: string): Promise<UserData[]> {
-    let query: FirebaseFirestore.Query = this.getCollection();
+    // Use simple query and sort in memory to avoid composite index requirement
+    let query = this.getCollection();
     if (role) {
       query = query.where("role", "==", role);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
-    return snapshot.docs.map(docToUserData).filter(Boolean) as UserData[];
+    const users = snapshot.docs.map(docToUserData).filter(Boolean) as UserData[];
+    // Sort in memory by createdAt descending
+    return users.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async create(data: CreateUserInput): Promise<UserData> {

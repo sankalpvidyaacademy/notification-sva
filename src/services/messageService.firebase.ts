@@ -1,6 +1,8 @@
 /**
  * Firebase Message Service Implementation
  * Uses Firestore for message operations
+ *
+ * Note: Queries sort in memory to avoid requiring composite indexes.
  */
 
 import { getFirestore } from "@/firebase/firebaseAdmin";
@@ -22,15 +24,15 @@ function docToMessageData(doc: FirebaseFirestore.DocumentSnapshot): MessageData 
     topic: d.topic || "",
     message: d.message || "",
     parentMsgId: d.parentMsgId || null,
-    createdAt: d.createdAt?.toDate() || new Date(),
-    updatedAt: d.updatedAt?.toDate() || new Date(),
+    createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : new Date(d.createdAt),
+    updatedAt: d.updatedAt?.toDate ? d.updatedAt.toDate() : new Date(d.updatedAt),
   };
 }
 
 export class FirebaseMessageService implements IMessageService {
   private getCollection() {
     const db = getFirestore();
-    if (!db) throw new Error("Firestore not initialized");
+    if (!db) throw new Error("Firestore not initialized - check Firebase Admin SDK configuration");
     return db.collection(COLLECTION);
   }
 
@@ -40,9 +42,10 @@ export class FirebaseMessageService implements IMessageService {
     }
 
     // For non-admin: get messages where user is sender or receiver
+    // Simple queries + in-memory sort to avoid composite index
     const [sentSnapshot, receivedSnapshot] = await Promise.all([
-      this.getCollection().where("senderId", "==", userId).orderBy("createdAt", "desc").get(),
-      this.getCollection().where("receiverId", "==", userId).orderBy("createdAt", "desc").get(),
+      this.getCollection().where("senderId", "==", userId).get(),
+      this.getCollection().where("receiverId", "==", userId).get(),
     ]);
 
     const messages = new Map<string, MessageData>();

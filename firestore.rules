@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───
+
+    // Check if the request comes from a authenticated user with a specific role
+    function isRole(role) {
+      return request.auth != null &&
+             request.auth.token.role == role;
+    }
+
+    // Check if the request comes from an admin
+    function isAdmin() {
+      return isRole('ADMIN');
+    }
+
+    // Check if the request comes from a teacher
+    function isTeacher() {
+      return isRole('TEACHER');
+    }
+
+    // Check if the request comes from a student
+    function isStudent() {
+      return isRole('STUDENT');
+    }
+
+    // Check if the authenticated user's userId matches the requested resource
+    function isOwner(userId) {
+      return request.auth != null &&
+             request.auth.token.userId == userId;
+    }
+
+    // ─── Users Collection ───
+    // Path: /users/{userId}
+
+    match /users/{userId} {
+      // Admin can do everything with users
+      allow read, write: if isAdmin();
+
+      // Teachers can read user info (for messaging, etc.)
+      allow read: if isTeacher();
+
+      // Students can read user info (for messaging, etc.)
+      allow read: if isStudent();
+
+      // Users can read their own data
+      allow read: if isOwner(resource.data.userId);
+
+      // No one can create/update/delete except admin
+      // (Admin write rule above handles this)
+    }
+
+    // ─── Notifications Collection ───
+    // Path: /notifications/{notifId}
+
+    match /notifications/{notifId} {
+      // Admin: full CRUD
+      allow read, write: if isAdmin();
+
+      // Teachers can read notifications addressed to teachers or sent by them
+      allow read: if isTeacher() &&
+        (resource.data.recipientType == 'TEACHER' ||
+         resource.data.senderId == request.auth.token.userId);
+
+      // Teachers can create notifications (to students only)
+      allow create: if isTeacher() &&
+        resource.data.senderRole == 'TEACHER' &&
+        resource.data.recipientType == 'STUDENT';
+
+      // Students can read notifications addressed to students
+      // where their class+subjects match the targetData
+      allow read: if isStudent() &&
+        resource.data.recipientType == 'STUDENT';
+
+      // No one can update or delete except admin
+    }
+
+    // ─── Messages Collection ───
+    // Path: /messages/{msgId}
+
+    match /messages/{msgId} {
+      // Admin: full CRUD (can see all messages)
+      allow read, write: if isAdmin();
+
+      // Users can read messages where they are sender or receiver
+      allow read: if request.auth != null &&
+        (resource.data.senderId == request.auth.token.userId ||
+         resource.data.receiverId == request.auth.token.userId);
+
+      // Any authenticated user can create messages
+      allow create: if request.auth != null &&
+        resource.data.senderId == request.auth.token.userId;
+
+      // No one can update or delete except admin
+    }
+
+    // ─── Class-Subjects Config (optional future use) ───
+    // Path: /config/{configId}
+
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ─── Deny all other collections by default ───
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
