@@ -29,19 +29,24 @@ export function LoginPage() {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, password, role }),
+        body: JSON.stringify({ userId: userId.trim(), password, role }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Login failed");
+        setError(data.error || "Login failed. Please try again.");
+        return;
+      }
+
+      if (!data.user) {
+        setError("Unexpected server response. Please try again.");
         return;
       }
 
       login(data.user);
     } catch {
-      setError("Network error. Please try again.");
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
