@@ -1,0 +1,21 @@
+// ─────────────────────────────────────────────────────────
+// FIRESTORE SECURITY RULES — PHASE 1 (INITIAL SETUP)
+// ─────────────────────────────────────────────────────────
+//
+// ⚠️ USE THIS FIRST during development and integration
+// ⚠️ This allows all authenticated reads/writes
+// ⚠️ Prevents permission errors while testing
+//
+// 🚨 APPLY PHASE 2 RULES AFTER FULL TESTING IS COMPLETE
+// ─────────────────────────────────────────────────────────
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Phase 1: Allow all authenticated users to read/write
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,102 @@
+// ─────────────────────────────────────────────────────────
+// FIRESTORE SECURITY RULES — PHASE 2 (PRODUCTION SECURITY)
+// ─────────────────────────────────────────────────────────
+//
+// 🚨 APPLY ONLY AFTER FULL TESTING IS COMPLETE
+// 🚨 This enforces role-based access control
+// 🚨 Applying too early may break the app
+//
+// ✅ Apply this when:
+//    1. All features are tested and working
+//    2. Authentication is stable
+//    3. You're ready for production deployment
+// ─────────────────────────────────────────────────────────
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───
+
+    // Check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Get user's role from custom claims or users collection
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+
+    // Check if user is admin
+    function isAdmin() {
+      return isAuth() && getUserRole() == 'ADMIN';
+    }
+
+    // Check if user is teacher
+    function isTeacher() {
+      return isAuth() && getUserRole() == 'TEACHER';
+    }
+
+    // Check if user is student
+    function isStudent() {
+      return isAuth() && getUserRole() == 'STUDENT';
+    }
+
+    // ─── Users Collection ───
+
+    match /users/{userId} {
+      // Admin can do everything
+      allow read, write: if isAdmin();
+
+      // Teachers can read other users
+      allow read: if isTeacher();
+
+      // Students can read their own profile
+      allow read: if isStudent() && request.auth.uid == userId;
+
+      // No one can create/update/delete except admin (handled above)
+    }
+
+    // ─── Notifications Collection ───
+
+    match /notifications/{notifId} {
+      // Admin can do everything
+      allow read, write: if isAdmin();
+
+      // Teachers can read notifications sent by them or to teachers
+      allow read: if isTeacher() &&
+        (resource.data.senderId == request.auth.token.userId ||
+         resource.data.recipientType == 'TEACHER');
+
+      // Teachers can create notifications
+      allow create: if isTeacher();
+
+      // Students can read notifications addressed to students
+      // that match their class and subjects
+      allow read: if isStudent() &&
+        resource.data.recipientType == 'STUDENT';
+
+      // No one can update/delete except admin (handled above)
+    }
+
+    // ─── Messages Collection ───
+
+    match /messages/{msgId} {
+      // Admin can see all messages (full monitoring)
+      allow read, write: if isAdmin();
+
+      // Users can read messages where they are sender or receiver
+      allow read: if isAuth() &&
+        (resource.data.senderId == request.auth.token.userId ||
+         resource.data.receiverId == request.auth.token.userId);
+
+      // Authenticated users can create messages
+      allow create: if isAuth() &&
+        request.data.senderId == request.auth.token.userId;
+
+      // No one can update messages
+      // Only admin can delete (handled above)
+    }
+  }
+}

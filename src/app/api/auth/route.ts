@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthService } from '@/adapters/appAdapter';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,43 +9,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({ where: { userId } });
+    const authService = getAuthService();
+    const user = await authService.authenticate(userId, password, role);
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid credentials or role mismatch' }, { status: 401 });
     }
 
-    if (user.password !== password) {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
-    }
-
-    if (user.role !== role) {
-      return NextResponse.json({ error: `This account does not have ${role} role` }, { status: 403 });
-    }
-
-    // Parse subjects based on role
-    let subjects;
-    try {
-      const parsed = JSON.parse(user.subjects);
-      if (user.role === 'STUDENT') {
-        // Student: subjects is a flat array
-        subjects = Array.isArray(parsed) ? parsed : [];
-      } else {
-        // Teacher/Admin: subjects is a class→subjects map
-        subjects = typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-      }
-    } catch {
-      subjects = user.role === 'STUDENT' ? [] : {};
-    }
-
-    const { password: _, ...userWithoutPassword } = user;
-    return NextResponse.json({
-      user: {
-        ...userWithoutPassword,
-        classes: JSON.parse(user.classes),
-        subjects,
-      },
-    });
+    return NextResponse.json({ user });
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ error: 'Login failed' }, { status: 500 });

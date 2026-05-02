@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { getMessageService } from '@/adapters/appAdapter';
 
 // GET /api/messages - List messages based on user role
 export async function GET(req: NextRequest) {
@@ -12,36 +12,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User ID and role are required' }, { status: 400 });
     }
 
-    let messages;
-
-    if (role === 'ADMIN') {
-      // Admin sees ALL messages (full monitoring)
-      messages = await db.message.findMany({
-        orderBy: { createdAt: 'desc' },
-      });
-    } else if (role === 'TEACHER') {
-      // Teacher sees: messages they sent + messages received from students
-      messages = await db.message.findMany({
-        where: {
-          OR: [
-            { senderId: userId },
-            { receiverId: userId },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      // Student sees: messages they sent + messages received (replies)
-      messages = await db.message.findMany({
-        where: {
-          OR: [
-            { senderId: userId },
-            { receiverId: userId },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
+    const messageService = getMessageService();
+    const messages = await messageService.findByUserId(userId, role);
 
     return NextResponse.json({ messages });
   } catch (error) {
@@ -59,18 +31,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 });
     }
 
-    const msg = await db.message.create({
-      data: {
-        senderId,
-        senderName,
-        senderRole,
-        receiverId,
-        receiverName,
-        receiverRole,
-        topic,
-        message,
-        parentMsgId: parentMsgId || null,
-      },
+    const messageService = getMessageService();
+    const msg = await messageService.create({
+      senderId,
+      senderName,
+      senderRole,
+      receiverId,
+      receiverName,
+      receiverRole,
+      topic,
+      message,
+      parentMsgId: parentMsgId || null,
     });
 
     return NextResponse.json({ message: msg }, { status: 201 });
@@ -90,7 +61,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
     }
 
-    await db.message.delete({ where: { id } });
+    const messageService = getMessageService();
+    await messageService.delete(id);
     return NextResponse.json({ message: 'Message deleted successfully' });
   } catch (error) {
     console.error('Delete message error:', error);

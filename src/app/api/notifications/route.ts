@@ -1,8 +1,6 @@
-import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-
-// Type for class→subjects mapping
-type ClassSubjectMap = Record<string, string[]>;
+import { getNotificationService, getUserService } from '@/adapters/appAdapter';
+import type { ClassSubjectMap } from '@/lib/class-subjects';
 
 // GET /api/notifications - List notifications based on user role
 export async function GET(req: NextRequest) {
@@ -17,27 +15,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User ID and role are required' }, { status: 400 });
     }
 
+    const notificationService = getNotificationService();
     let notifications;
 
     if (role === 'ADMIN') {
       // Admin sees all notifications
-      notifications = await db.notification.findMany({
-        orderBy: { createdAt: 'desc' },
-      });
+      notifications = await notificationService.findAll();
     } else if (role === 'TEACHER') {
       // Teacher sees: notifications they sent + notifications addressed to teachers
-      const sender = await db.user.findUnique({ where: { id: userId } });
-      const teacherUserId = sender?.userId || '';
-
-      notifications = await db.notification.findMany({
-        where: {
-          OR: [
-            { senderId: teacherUserId },
-            { recipientType: 'TEACHER' },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const [sentNotifs, teacherNotifs] = await Promise.all([
+        notificationService.findBySender(userId),
+        notificationService.findByRecipientType('TEACHER'),
+      ]);
+      // Merge and deduplicate
+      const seen = new Set<string>();
+      notifications = [];
+      for (const n of [...sentNotifs, ...teacherNotifs]) {
+        if (!seen.has(n.id)) {
+          seen.add(n.id);
+          notifications.push(n);
+        }
+      }
+      // Sort by createdAt descending
+      notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     } else if (role === 'STUDENT') {
       // Student sees: notifications addressed to students where their class+subjects match
       const classes: string[] = userClasses ? JSON.parse(userClasses) : [];
@@ -46,16 +46,12 @@ export async function GET(req: NextRequest) {
       if (classes.length === 0 || subjects.length === 0) {
         notifications = [];
       } else {
-        // Get all STUDENT notifications and filter in-memory for precise matching
-        const allStudentNotifs = await db.notification.findMany({
-          where: { recipientType: 'STUDENT' },
-          orderBy: { createdAt: 'desc' },
-        });
+        const allStudentNotifs = await notificationService.findByRecipientType('STUDENT');
 
         // Filter: student receives notif if their class is in targetData AND their subjects intersect
         notifications = allStudentNotifs.filter((notif) => {
           try {
-            const targetData: ClassSubjectMap = JSON.parse(notif.targetData);
+            const targetData: ClassSubjectMap = notif.targetData;
             const studentClass = classes[0]; // Student has single class
             const targetSubjects = targetData[studentClass];
             if (!targetSubjects) return false;
@@ -70,13 +66,7 @@ export async function GET(req: NextRequest) {
       notifications = [];
     }
 
-    // Parse targetData for each notification
-    const parsed = notifications.map((n) => ({
-      ...n,
-      targetData: JSON.parse(n.targetData),
-    }));
-
-    return NextResponse.json({ notifications: parsed });
+    return NextResponse.json({ notifications });
   } catch (error) {
     console.error('Get notifications error:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
@@ -105,28 +95,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Get sender role from senderId
-    const sender = await db.user.findUnique({ where: { userId: senderId } });
+    const userService = getUserService();
+    const sender = await userService.findByUserId(senderId);
     const senderRole = sender?.role || 'ADMIN';
 
-    const notification = await db.notification.create({
-      data: {
-        senderId,
-        senderName,
-        senderRole,
-        recipientType,
-        targetData: JSON.stringify(targetData || {}),
-        topic,
-        message,
-        date: date || new Date().toISOString().split('T')[0],
-      },
+    const notificationService = getNotificationService();
+    const notification = await notificationService.create({
+      senderId,
+      senderName,
+      senderRole,
+      recipientType,
+      targetData: targetData || {},
+      topic,
+      message,
+      date: date || new Date().toISOString().split('T')[0],
     });
 
-    return NextResponse.json({
-      notification: {
-        ...notification,
-        targetData: JSON.parse(notification.targetData),
-      },
-    }, { status: 201 });
+    return NextResponse.json({ notification }, { status: 201 });
   } catch (error) {
     console.error('Create notification error:', error);
     return NextResponse.json({ error: 'Failed to create notification' }, { status: 500 });
@@ -143,7 +128,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Notification ID is required' }, { status: 400 });
     }
 
-    await db.notification.delete({ where: { id } });
+    const notificationService = getNotificationService();
+    await notificationService.delete(id);
     return NextResponse.json({ message: 'Notification deleted successfully' });
   } catch (error) {
     console.error('Delete notification error:', error);

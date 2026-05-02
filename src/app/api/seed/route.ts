@@ -1,22 +1,22 @@
-import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { getUserService } from '@/adapters/appAdapter';
 
 export async function POST() {
   try {
-    const existing = await db.user.findUnique({ where: { userId: 'shobhit' } });
+    const userService = getUserService();
+
+    const existing = await userService.findByUserId('shobhit');
     if (existing) {
       return NextResponse.json({ message: 'Admin already exists' }, { status: 200 });
     }
 
-    await db.user.create({
-      data: {
-        userId: 'shobhit',
-        name: 'Admin',
-        password: 'Shobhit@1502',
-        role: 'ADMIN',
-        classes: '[]',
-        subjects: '{}',
-      },
+    await userService.create({
+      userId: 'shobhit',
+      name: 'Admin',
+      password: 'Shobhit@1502',
+      role: 'ADMIN',
+      classes: [],
+      subjects: {},
     });
 
     return NextResponse.json({ message: 'Admin user seeded successfully' }, { status: 201 });
