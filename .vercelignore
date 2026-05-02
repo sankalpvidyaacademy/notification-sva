@@ -3,16 +3,10 @@ node_modules
 .env
 .env.local
 .env*.local
-db/
-*.db
 *.log
-prisma/
-firebase/
-firestore-rules/
 examples/
 download/
 skills/
 mini-services/
-worklog.md
 .claude
 .z-ai-config

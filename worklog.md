@@ -157,3 +157,38 @@ Stage Summary:
 - serverExternalPackages in next.config.ts adds extra protection
 - All API routes now use async service getters (await)
 - App fully functional with no module resolution or bundling errors
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Comprehensive codebase cleanup for Vercel deployment
+
+Work Log:
+- Deleted old /firebase/firebaseConfig.ts and /firebase/firebaseInit.ts re-export stubs (causing confusion)
+- Only /firebase/migrate-to-firestore.ts remains in root /firebase/ (standalone script)
+- Simplified /vercel.json — removed explicit buildCommand/installCommand (Vercel auto-detects Next.js)
+- Simplified /.vercelignore — removed unnecessary exclusions (firebase/, firestore-rules/, prisma/ are needed)
+- Restored output: "standalone" in next.config.ts (required for dev server stability)
+- Cleared .next cache for fresh build
+- Full import audit: zero stale ../../firebase imports remain in src/
+- All import paths verified:
+  - appAdapter.ts → @/firebase/firebaseEnv (no admin SDK)
+  - userService.firebase.ts → @/firebase/firebaseAdmin (server-only)
+  - notificationService.firebase.ts → @/firebase/firebaseAdmin (server-only)
+  - messageService.firebase.ts → @/firebase/firebaseAdmin (server-only)
+  - authService.firebase.ts → ./userService.firebase (local import only)
+  - migrate-to-firestore.ts → ../src/firebase/firebaseAdmin (standalone script)
+- All APIs tested and working: auth, users, notifications, messages, adapter-status
+- Lint passes cleanly
+- Dev server runs with no errors
+
+Stage Summary:
+- Codebase fully organized and clean
+- No stale import paths anywhere
+- No unnecessary files
+- All Firebase code properly split: firebaseEnv (client-safe) vs firebaseAdmin (server-only)
+- Three layers of protection prevent firebase-admin from reaching client bundle:
+  1. Dynamic require() in firebaseAdmin.ts
+  2. Dynamic await import() in appAdapter.ts
+  3. serverExternalPackages in next.config.ts
+- Ready for Vercel deployment — push latest code to trigger rebuild
