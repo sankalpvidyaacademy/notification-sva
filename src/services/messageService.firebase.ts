@@ -3,7 +3,7 @@
  * Uses Firestore for message operations
  */
 
-import { getFirestore } from "@/firebase/firebaseInit";
+import { getFirestore } from "@/firebase/firebaseAdmin";
 import type { IMessageService, MessageData, SendMessageInput } from "./types";
 
 const COLLECTION = "messages";

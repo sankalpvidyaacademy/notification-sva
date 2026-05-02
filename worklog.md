@@ -122,3 +122,38 @@ Stage Summary:
 - Old /firebase/ files converted to re-export stubs for backward compatibility
 - Migration script updated to use canonical path
 - App fully functional with no module errors
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Fix "Module not found" — firebase-admin client bundle issue
+
+Work Log:
+- Root cause: `import * as admin from "firebase-admin"` in firebaseInit.ts was a top-level import, causing Next.js to try bundling firebase-admin for the browser client bundle (which fails because firebase-admin is Node.js-only)
+- Split /src/firebase/firebaseInit.ts into two modules:
+  - /src/firebase/firebaseEnv.ts — Pure env checks (isFirebaseEnabled, isFirebaseConfigured), NO firebase-admin import, safe for client & server
+  - /src/firebase/firebaseAdmin.ts — Admin SDK init + Firestore getters, uses dynamic require() for firebase-admin (server-only)
+- /src/firebase/firebaseInit.ts converted to re-export hub from both modules
+- Updated /src/adapters/appAdapter.ts:
+  - Import env checks from @/firebase/firebaseEnv (no admin SDK)
+  - Use dynamic imports for Firebase service classes (await import("../services/xxx.firebase"))
+  - All service getters now return Promises (async)
+- Updated all API routes to await the service getters:
+  - /api/auth/route.ts → `await getAuthService()`
+  - /api/users/route.ts → `await getUserService()` (4 occurrences)
+  - /api/notifications/route.ts → `await getNotificationService()` + `await getUserService()`
+  - /api/messages/route.ts → `await getMessageService()` (3 occurrences)
+  - /api/seed/route.ts → `await getUserService()`
+- Added `serverExternalPackages: ["firebase-admin"]` to next.config.ts to prevent bundling
+- Added eslint-disable for intentional require() in firebaseAdmin.ts
+- Updated /firebase/firebaseInit.ts re-export stub to use new paths
+- Updated /firebase/migrate-to-firestore.ts to import from ../src/firebase/firebaseAdmin
+- All APIs tested and working (auth, users, notifications, messages, adapter-status)
+- Lint passes cleanly
+
+Stage Summary:
+- Firebase code properly split into client-safe (firebaseEnv) and server-only (firebaseAdmin) modules
+- Dynamic imports in adapter prevent firebase-admin from ever reaching the client bundle
+- serverExternalPackages in next.config.ts adds extra protection
+- All API routes now use async service getters (await)
+- App fully functional with no module resolution or bundling errors

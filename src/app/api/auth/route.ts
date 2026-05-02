@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
 
-    const authService = getAuthService();
+    const authService = await getAuthService();
     const user = await authService.authenticate(userId, password, role);
 
     if (!user) {

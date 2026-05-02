@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User ID and role are required' }, { status: 400 });
     }
 
-    const notificationService = getNotificationService();
+    const notificationService = await getNotificationService();
     let notifications;
 
     if (role === 'ADMIN') {
@@ -95,11 +95,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Get sender role from senderId
-    const userService = getUserService();
+    const userService = await getUserService();
     const sender = await userService.findByUserId(senderId);
     const senderRole = sender?.role || 'ADMIN';
 
-    const notificationService = getNotificationService();
+    const notificationService = await getNotificationService();
     const notification = await notificationService.create({
       senderId,
       senderName,
@@ -128,7 +128,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Notification ID is required' }, { status: 400 });
     }
 
-    const notificationService = getNotificationService();
+    const notificationService = await getNotificationService();
     await notificationService.delete(id);
     return NextResponse.json({ message: 'Notification deleted successfully' });
   } catch (error) {

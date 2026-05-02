@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const role = searchParams.get('role');
 
-    const userService = getUserService();
+    const userService = await getUserService();
     const users = await userService.findAll(role || undefined);
 
     // Remove passwords from response
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 });
     }
 
-    const userService = getUserService();
+    const userService = await getUserService();
 
     // Check if user already exists
     const existing = await userService.findByUserId(userId);
@@ -63,7 +63,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const userService = getUserService();
+    const userService = await getUserService();
 
     const existing = await userService.findById(id);
     if (!existing) {
@@ -97,7 +97,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    const userService = getUserService();
+    const userService = await getUserService();
     await userService.delete(id);
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error) {

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User ID and role are required' }, { status: 400 });
     }
 
-    const messageService = getMessageService();
+    const messageService = await getMessageService();
     const messages = await messageService.findByUserId(userId, role);
 
     return NextResponse.json({ messages });
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 });
     }
 
-    const messageService = getMessageService();
+    const messageService = await getMessageService();
     const msg = await messageService.create({
       senderId,
       senderName,
@@ -61,7 +61,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
     }
 
-    const messageService = getMessageService();
+    const messageService = await getMessageService();
     await messageService.delete(id);
     return NextResponse.json({ message: 'Message deleted successfully' });
   } catch (error) {

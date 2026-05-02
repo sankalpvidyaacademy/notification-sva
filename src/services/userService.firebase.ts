@@ -3,7 +3,7 @@
  * Uses Firestore for user operations
  */
 
-import { getFirestore } from "@/firebase/firebaseInit";
+import { getFirestore } from "@/firebase/firebaseAdmin";
 import type { IUserService, UserData, CreateUserInput, UpdateUserInput } from "./types";
 
 const COLLECTION = "users";

@@ -3,7 +3,7 @@ import { getUserService } from '@/adapters/appAdapter';
 
 export async function POST() {
   try {
-    const userService = getUserService();
+    const userService = await getUserService();
 
     const existing = await userService.findByUserId('shobhit');
     if (existing) {

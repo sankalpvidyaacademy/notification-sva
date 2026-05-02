@@ -10,24 +10,18 @@
  *   - Set USE_FIREBASE=true + Firebase credentials → Uses Firestore
  *   - Set USE_FIREBASE=false or unset → Uses Prisma/SQLite (default)
  *
- * This ensures zero-code-change in UI components.
- * API routes use this adapter instead of direct database calls.
+ * ⚠️ Firebase services use dynamic imports to prevent
+ * firebase-admin from being bundled in the client.
  */
 
-import { isFirebaseEnabled, isFirebaseConfigured } from "@/firebase/firebaseInit";
+import { isFirebaseEnabled, isFirebaseConfigured } from "@/firebase/firebaseEnv";
 import type { IUserService, IAuthService, INotificationService, IMessageService } from "../services/types";
 
-// Prisma implementations
+// Prisma implementations (safe for both client & server)
 import { PrismaUserService } from "../services/userService.prisma";
 import { PrismaAuthService } from "../services/authService.prisma";
 import { PrismaNotificationService } from "../services/notificationService.prisma";
 import { PrismaMessageService } from "../services/messageService.prisma";
-
-// Firebase implementations
-import { FirebaseUserService } from "../services/userService.firebase";
-import { FirebaseAuthService } from "../services/authService.firebase";
-import { FirebaseNotificationService } from "../services/notificationService.firebase";
-import { FirebaseMessageService } from "../services/messageService.firebase";
 
 // ─── Singleton instances ───
 
@@ -44,35 +38,65 @@ function getBackendType(): "firebase" | "prisma" {
   return shouldUseFirebase() ? "firebase" : "prisma";
 }
 
+// ─── Dynamic import helpers for Firebase (server-only) ───
+
+async function getFirebaseUserService(): Promise<IUserService> {
+  const { FirebaseUserService } = await import("../services/userService.firebase");
+  return new FirebaseUserService();
+}
+
+async function getFirebaseAuthService(): Promise<IAuthService> {
+  const { FirebaseAuthService } = await import("../services/authService.firebase");
+  return new FirebaseAuthService();
+}
+
+async function getFirebaseNotificationService(): Promise<INotificationService> {
+  const { FirebaseNotificationService } = await import("../services/notificationService.firebase");
+  return new FirebaseNotificationService();
+}
+
+async function getFirebaseMessageService(): Promise<IMessageService> {
+  const { FirebaseMessageService } = await import("../services/messageService.firebase");
+  return new FirebaseMessageService();
+}
+
 // ─── Public API ───
 
-export function getUserService(): IUserService {
+export async function getUserService(): Promise<IUserService> {
   if (!_userService) {
-    _userService = shouldUseFirebase() ? new FirebaseUserService() : new PrismaUserService();
+    _userService = shouldUseFirebase()
+      ? await getFirebaseUserService()
+      : new PrismaUserService();
     console.log(`[Adapter] User Service → ${getBackendType().toUpperCase()}`);
   }
   return _userService;
 }
 
-export function getAuthService(): IAuthService {
+export async function getAuthService(): Promise<IAuthService> {
   if (!_authService) {
-    _authService = shouldUseFirebase() ? new FirebaseAuthService() : new PrismaAuthService();
+    _authService = shouldUseFirebase()
+      ? await getFirebaseAuthService()
+      : new PrismaAuthService();
     console.log(`[Adapter] Auth Service → ${getBackendType().toUpperCase()}`);
   }
   return _authService;
 }
 
-export function getNotificationService(): INotificationService {
+export async function getNotificationService(): Promise<INotificationService> {
   if (!_notificationService) {
-    _notificationService = shouldUseFirebase() ? new FirebaseNotificationService() : new PrismaNotificationService();
+    _notificationService = shouldUseFirebase()
+      ? await getFirebaseNotificationService()
+      : new PrismaNotificationService();
     console.log(`[Adapter] Notification Service → ${getBackendType().toUpperCase()}`);
   }
   return _notificationService;
 }
 
-export function getMessageService(): IMessageService {
+export async function getMessageService(): Promise<IMessageService> {
   if (!_messageService) {
-    _messageService = shouldUseFirebase() ? new FirebaseMessageService() : new PrismaMessageService();
+    _messageService = shouldUseFirebase()
+      ? await getFirebaseMessageService()
+      : new PrismaMessageService();
     console.log(`[Adapter] Message Service → ${getBackendType().toUpperCase()}`);
   }
   return _messageService;
