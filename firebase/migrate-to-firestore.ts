@@ -17,7 +17,7 @@
  */
 
 import { db } from "../src/lib/db";
-import { getFirestore } from "./firebaseInit";
+import { getFirestore } from "../src/firebase/firebaseInit";
 
 async function migrateUsers() {
   console.log("📦 Migrating users...");

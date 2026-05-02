@@ -14,7 +14,7 @@
  * API routes use this adapter instead of direct database calls.
  */
 
-import { isFirebaseEnabled, isFirebaseConfigured } from "../../firebase/firebaseInit";
+import { isFirebaseEnabled, isFirebaseConfigured } from "@/firebase/firebaseInit";
 import type { IUserService, IAuthService, INotificationService, IMessageService } from "../services/types";
 
 // Prisma implementations

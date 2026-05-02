@@ -3,7 +3,7 @@
  * Uses Firestore for notification operations
  */
 
-import { getFirestore } from "../../firebase/firebaseInit";
+import { getFirestore } from "@/firebase/firebaseInit";
 import type { INotificationService, NotificationData, CreateNotificationInput } from "./types";
 
 const COLLECTION = "notifications";

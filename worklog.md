@@ -96,3 +96,29 @@ Stage Summary:
 - Architecture note: Admin SDK (used in API routes) bypasses all Firestore rules, so server-side operations are unaffected
 - Phase 2 rules provide defense-in-depth for any potential direct client-side Firestore access
 - Custom claims (role, userId) must be set on Firebase Auth users for Phase 2 rules to work with client-side access
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix "Module not found: Can't resolve ../../firebase/firebaseInit" error
+
+Work Log:
+- Root cause: firebase/ directory was outside src/ and Next.js webpack couldn't resolve imports from outside the source tree
+- Created /src/firebase/firebaseConfig.ts - Moved from /firebase/firebaseConfig.ts (canonical location inside src/)
+- Created /src/firebase/firebaseInit.ts - Moved from /firebase/firebaseInit.ts (canonical location inside src/)
+- Updated import in /src/adapters/appAdapter.ts: `../../firebase/firebaseInit` → `@/firebase/firebaseInit`
+- Updated import in /src/services/userService.firebase.ts: `../../firebase/firebaseInit` → `@/firebase/firebaseInit`
+- Updated import in /src/services/notificationService.firebase.ts: `../../firebase/firebaseInit` → `@/firebase/firebaseInit`
+- Updated import in /src/services/messageService.firebase.ts: `../../firebase/firebaseInit` → `@/firebase/firebaseInit`
+- Updated /firebase/migrate-to-firestore.ts: import path `./firebaseInit` → `../src/firebase/firebaseInit`
+- Converted /firebase/firebaseConfig.ts and /firebase/firebaseInit.ts to re-export stubs pointing to canonical src/ locations (backward compat for standalone scripts)
+- All API endpoints tested: auth, users, notifications, messages, adapter-status — all return 200
+- Lint passes cleanly
+- No module resolution errors in dev server logs
+
+Stage Summary:
+- Firebase config/init files moved inside src/firebase/ for proper webpack resolution
+- All service and adapter imports use @/firebase/ alias path
+- Old /firebase/ files converted to re-export stubs for backward compatibility
+- Migration script updated to use canonical path
+- App fully functional with no module errors
