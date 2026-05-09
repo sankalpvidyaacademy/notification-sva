@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Shield -->
+  <path d="M256 20 
+           L460 80 
+           V240 
+           C460 360 360 460 256 500 
+           C152 460 52 360 52 240 
+           V80 Z"
+        fill="white" stroke="#0f6b4f" stroke-width="12"/>
+
+  <!-- SVA Text -->
+  <text x="50%" y="130" text-anchor="middle"
+        font-size="80" font-weight="bold"
+        fill="#0f6b4f" font-family="Arial">
+    SVA
+  </text>
+
+  <!-- Notification Text -->
+  <text x="50%" y="180" text-anchor="middle"
+        font-size="30"
+        fill="#0f6b4f" font-family="Arial">
+    NOTIFICATION
+  </text>
+
+  <!-- Bell Icon -->
+  <path d="M256 230 
+           C220 230 200 260 200 300 
+           V330 
+           L180 350 
+           H332 
+           L312 330 
+           V300 
+           C312 260 292 230 256 230 Z"
+        fill="#222"/>
+
+  <!-- Bell bottom -->
+  <circle cx="256" cy="360" r="12" fill="#222"/>
+
+  <!-- Ring lines -->
+  <path d="M180 260 Q160 300 180 340"
+        fill="none" stroke="#222" stroke-width="6"/>
+  <path d="M332 260 Q352 300 332 340"
+        fill="none" stroke="#222" stroke-width="6"/>
+
+  <!-- Message Circle -->
+  <circle cx="340" cy="360" r="40" fill="#0f6b4f"/>
+
+  <!-- Envelope -->
+  <rect x="315" y="345" width="50" height="30"
+        fill="white" rx="5"/>
+  <polyline points="315,345 340,365 365,345"
+            fill="none" stroke="#0f6b4f" stroke-width="3"/>
+</svg>
